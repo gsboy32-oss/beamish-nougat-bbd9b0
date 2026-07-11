@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyOS</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --text-primary: #FAFAFA;
+    --text-secondary: #B8B6B0;
+    --text-tertiary: #76746E;
+    --success: #6BE3A4;
+    --warning: #F2C063;
+    --danger: #FF6B6B;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: #050506;
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    padding-top: max(32px, env(safe-area-inset-top));
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: 60px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(700px circle at 82% 14%, rgba(224, 118, 88, 0.16), transparent 60%),
+      radial-gradient(700px circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 60%);
+    filter: blur(40px);
+    animation: washDrift 36s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+    background-size: 3px 3px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes washDrift {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-4%, 3%) scale(1.05); }
+  }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---------- Title ---------- */
+  .dash-title {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+    background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 0 0 14px 0;
+  }
+  @media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+  /* ---------- Card chassis ---------- */
+  .gm-card {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    padding: 20px;
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .gm-card:last-child { margin-bottom: 0; }
+
+  /* ---------- Goal ticker ---------- */
+  .ticker-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+  .goal-ticker {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; border-radius: 12px;
+    background-image:
+      linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.30) 100%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    position: relative; overflow: hidden;
+  }
+  .goal-ticker::after {
+    content: '';
+    position: absolute; top: 0; left: -40%; width: 30%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: tickerSweep 8s linear infinite;
+  }
+  @keyframes tickerSweep { from { left: -40%; } to { left: 110%; } }
+
+  .goal-ticker-led { display: flex; align-items: center; }
+  .goal-ticker-led-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #6BE3A4; box-shadow: 0 0 8px rgba(107,227,164,0.7);
+    display: block;
+    animation: ledPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes ledPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.85); } }
+
+  .goal-ticker-label {
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 800; letter-spacing: 0.18em;
+    color: var(--text-tertiary); white-space: nowrap;
+  }
+  .goal-ticker-stage { flex: 1; height: 22px; position: relative; overflow: hidden; }
+  .goal-ticker-row {
+    display: flex; align-items: center; gap: 8px; height: 22px;
+    font-family: var(--font-mono); font-size: 12.5px; font-weight: 600;
+    font-variant-numeric: tabular-nums; color: var(--text-primary);
+    white-space: nowrap; position: absolute; top: 0; left: 0; right: 0;
+  }
+  .goal-ticker-status { width: 18px; flex: 0 0 18px; display: flex; justify-content: center; color: var(--text-tertiary); }
+  .goal-ticker-status[data-status="done"] { color: var(--success); }
+  .goal-ticker-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .goal-ticker-meta {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--text-secondary); letter-spacing: 0.04em;
+    padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.04); white-space: nowrap;
+  }
+  .goal-ticker-row.is-leaving { animation: ticker-leave 0.45s cubic-bezier(0.55, 0, 0.55, 1) forwards; }
+  .goal-ticker-row.is-entering { animation: ticker-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  @keyframes ticker-leave { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100%); } }
+  @keyframes ticker-enter { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 480px) {
+    .goal-ticker { padding: 9px 12px; }
+    .goal-ticker-label { font-size: 9px; letter-spacing: 0.14em; }
+    .goal-ticker-row { font-size: 12px; }
+    .goal-ticker-meta { font-size: 10px; padding: 2px 7px; }
+  }
+
+  /* ---------- Day ring ---------- */
+  .day-ring-section { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; margin-bottom: 28px; }
+  .day-ring-visual { width: 168px; height: 168px; position: relative; flex: 0 0 auto; }
+  .day-ring-visual svg { width: 100%; height: 100%; }
+  .day-ring-track, .day-ring-fill { fill: none; stroke-width: 8; }
+  .day-ring-track { stroke: rgba(255, 255, 255, 0.06); }
+  .day-ring-fill {
+    stroke-linecap: round;
+    transition: stroke 0.7s cubic-bezier(0.22, 1, 0.36, 1), stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .day-ring-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; text-align: center;
+  }
+  .day-ring-percent { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .day-ring-phase { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.16em; color: var(--text-tertiary); margin-top: 5px; }
+  .day-ring-clock { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-tertiary); margin-top: 2px; }
+
+  .day-ring-info { max-width: 280px; display: flex; flex-direction: column; gap: 6px; }
+  .day-ring-status { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .day-ring-remaining { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+  .day-ring-hours { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+
+  @media (max-width: 480px) {
+    .day-ring-visual { width: 144px; height: 144px; }
+    .day-ring-percent { font-size: 32px; }
+    .day-ring-status { font-size: 13px; }
+  }
+
+  /* ---------- Section title ---------- */
+  .section-title {
+    font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-tertiary);
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .section-title::before { content: ''; width: 18px; height: 1px; background: var(--text-tertiary); opacity: 0.6; }
+  .section-title::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+  /* ---------- Todo header ---------- */
+  .gm-header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .gm-eyebrow { font-size: 10.5px; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.18em; margin-bottom: 6px; }
+  .gm-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .gm-progress-row { display: flex; align-items: baseline; gap: 6px; }
+  .gm-progress-num { font-size: 42px; font-weight: 700; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
+  .gm-progress-total { font-family: var(--font-mono); font-size: 18px; color: var(--text-tertiary); }
+  .gm-progress-label { font-size: 11px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-tertiary); margin-left: 4px; }
+  .gm-card-tomorrow .gm-progress-row { display: none; }
+
+  .gm-streak {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.04); color: var(--text-tertiary); border: 1px solid transparent; height: fit-content;
+  }
+  .gm-streak.gm-streak-active { background: rgba(242,192,99,0.10); color: #F2C063; border-color: rgba(242,192,99,0.32); }
+  .gm-streak-bolt { font-size: 13px; }
+  .gm-streak-active .gm-streak-bolt { filter: drop-shadow(0 0 6px rgba(242,192,99,0.6)); }
+  .gm-streak-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .gm-streak-label { text-transform: uppercase; letter-spacing: 0.10em; font-size: 10px; }
+
+  .gm-count-badge { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; font-variant-numeric: tabular-nums; color: var(--text-tertiary); height: fit-content; }
+
+  .gm-bar { display: flex; gap: 4px; height: 6px; margin-bottom: 16px; }
+  .gm-bar:empty { display: none; }
+  .gm-bar-seg { flex: 1; border-radius: 3px; background: rgba(255,255,255,0.08); }
+  .gm-bar-seg-done { background: #6BE3A4; box-shadow: 0 0 6px rgba(107,227,164,0.40); }
+
+  .goal-list, .gm-list { list-style: none; margin: 0; padding: 0; }
+  .empty-state { font-size: 12px; color: var(--text-tertiary); font-style: italic; padding: 14px 0; text-align: center; }
+
+  .goal-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; margin-bottom: 6px;
+    background: rgba(255,255,255,0.035); border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+  }
+  .goal-row:hover { background: rgba(255,255,255,0.06); }
+  .goal-row:hover .goal-drag-handle, .goal-row:hover .goal-delete { opacity: 1; }
+  .goal-row.is-drag-over { border-top: 2px solid var(--text-secondary); }
+
+  .goal-drag-handle {
+    width: 14px; flex: 0 0 14px; opacity: 0; cursor: grab; letter-spacing: -2px;
+    color: var(--text-tertiary); transition: opacity 0.15s; user-select: none;
+  }
+
+  .goal-checkbox {
+    width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.2); flex: 0 0 22px; position: relative; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+  }
+  .goal-checkbox:checked { background: #6BE3A4; border-color: #6BE3A4; box-shadow: 0 0 12px rgba(107,227,164,0.40); }
+  .goal-checkbox:checked::after {
+    content: ''; position: absolute; left: 50%; top: 46%;
+    width: 5px; height: 10px; border: solid #06110c; border-width: 0 2px 2px 0;
+    transform: translate(-50%, -60%) rotate(45deg) scale(0);
+    animation: checkPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @keyframes checkPop {
+    from { transform: translate(-50%, -60%) rotate(45deg) scale(0); }
+    to   { transform: translate(-50%, -60%) rotate(45deg) scale(1); }
+  }
+  .goal-checkbox:disabled { cursor: not-allowed; opacity: 0.6; }
+
+  .goal-text { flex: 1; font-size: 14px; color: var(--text-primary); outline: none; word-break: break-word; cursor: text; }
+  .goal-text[contenteditable="true"] { outline: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 4px; }
+
+  .gm-queue-btn { background: none; border: none; font-size: 14px; color: var(--text-tertiary); opacity: 0.55; cursor: pointer; padding: 4px; }
+  .gm-queue-btn.gm-queue-active { color: #F2C063; opacity: 1; filter: drop-shadow(0 0 4px rgba(242,192,99,0.65)); }
+  .gm-queue-btn:disabled { cursor: not-allowed; }
+  .goal-row.is-queue-flashing { animation: gm-queue-flash 0.48s ease; }
+  @keyframes gm-queue-flash {
+    0% { background: rgba(255,255,255,0.035); transform: scale(1); }
+    50% { background: rgba(242,192,99,0.32); transform: scale(1.015); }
+    100% { background: rgba(255,255,255,0.035); transform: scale(1); }
+  }
+
+  .goal-delete { background: none; border: none; color: var(--text-tertiary); opacity: 0.5; cursor: pointer; font-size: 16px; padding: 4px; transition: opacity 0.15s, color 0.15s; }
+  .goal-delete:hover { color: var(--danger); opacity: 1; }
+
+  .goal-row.is-done { opacity: 0.45; background: rgba(107,227,164,0.04); }
+  .goal-row.is-done .goal-text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+
+  .goal-row.is-queued { background: rgba(242,192,99,0.10); box-shadow: inset 3px 0 0 0 #F2C063; }
+  .goal-row.is-queued .goal-text { color: #FFE2A8; }
+
+  .gm-card.gm-all-done {
+    background:
+      radial-gradient(ellipse 600px 200px at 50% 0%, rgba(107,227,164,0.10), transparent 70%),
+      rgba(255,255,255,0.04);
+  }
+  .gm-card.gm-all-done .gm-progress-num,
+  .gm-card.gm-all-done .gm-progress-label { color: #6BE3A4; }
+
+  .gm-show-more {
+    width: 100%; padding: 10px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px;
+    background: none; color: var(--text-tertiary); font-size: 12px; cursor: pointer; margin-bottom: 6px;
+  }
+  .gm-show-more:hover { color: var(--text-primary); }
+
+  .gm-push-btn {
+    width: 100%; padding: 12px; border: 1px dashed rgba(255,255,255,0.14); border-radius: 12px;
+    background: none; color: var(--text-tertiary); font-size: 13px; cursor: pointer; margin-top: 4px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .gm-push-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.28); }
+
+  .gm-input-wrap { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
+  .gm-input {
+    flex: 1; min-width: 120px; padding: 11px 14px; border-radius: 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-primary); font-size: 13px; outline: none;
+  }
+  .gm-input::placeholder { color: var(--text-tertiary); }
+  .gm-input:focus { border-color: rgba(255,255,255,0.3); }
+
+  .gm-btn { border: none; border-radius: 999px; font-weight: 700; font-size: 11px; padding: 11px 20px; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
+  .gm-btn-primary {
+    background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%); color: #0A0A0B;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 6px 16px rgba(0,0,0,0.35);
+  }
+  .gm-btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .gm-btn-secondary { background: rgba(255,255,255,0.04); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.10); }
+  .gm-btn-secondary:hover { transform: translateY(-1px); }
+
+  .gm-status-line { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; min-height: 14px; }
+  .gm-status-line.is-error { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="dash-title">SkyOS</h1>
+
+  <div class="ticker-row">
+    <div class="goal-ticker" id="goalTicker" aria-live="polite" aria-atomic="true">
+      <div class="goal-ticker-led"><span class="goal-ticker-led-dot"></span></div>
+      <div class="goal-ticker-label">GOALS</div>
+      <div class="goal-ticker-stage" id="goalTickerStage">
+        <div class="goal-ticker-row">
+          <span class="goal-ticker-status" data-status="">—</span>
+          <span class="goal-ticker-text">Loading…</span>
+        </div>
+      </div>
+      <div class="goal-ticker-meta" id="goalTickerMeta">0/0</div>
+    </div>
+  </div>
+
+  <div class="day-ring-section">
+    <div class="day-ring-visual">
+      <svg viewBox="0 0 120 120">
+        <defs>
+          <filter id="ringGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <circle cx="60" cy="60" r="52" class="day-ring-track"></circle>
+        <circle cx="60" cy="60" r="52" class="day-ring-fill" id="dayRingFill" transform="rotate(-90 60 60)" filter="url(#ringGlow)"></circle>
+      </svg>
+      <div class="day-ring-overlay">
+        <div class="day-ring-percent" id="dayRingPercent">—</div>
+        <div class="day-ring-phase" id="dayRingPhase">SLEEPING</div>
+        <div class="day-ring-clock" id="dayRingClock">--:--</div>
+      </div>
+    </div>
+    <div class="day-ring-info">
+      <div class="day-ring-status" id="dayRingStatus">😴 Still sleeping</div>
+      <div class="day-ring-remaining" id="dayRingRemaining">—</div>
+      <div class="day-ring-hours">8:00 AM – 12:00 AM</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">To Do List</div>
+
+    <div class="gm-card" id="todayCard">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow" id="todayLabel">Today — </div>
+          <div class="gm-progress-row">
+            <span class="gm-progress-num" id="gmProgressNum">0</span>
+            <span class="gm-progress-total" id="gmProgressTotal">/ 0</span>
+            <span class="gm-progress-label" id="gmProgressLabel">no goals yet</span>
+          </div>
+        </div>
+        <div class="gm-streak" id="gmStreak">
+          <span class="gm-streak-bolt">⚡</span>
+          <span class="gm-streak-num" id="gmStreakNum">0</span>
+          <span class="gm-streak-label">day streak</span>
+        </div>
+      </div>
+      <div class="gm-bar" id="gmBar"></div>
+      <ul id="goalList" class="goal-list gm-list"></ul>
+      <div id="emptyState" class="empty-state">No goals for today yet — add one below.</div>
+      <button type="button" class="gm-push-btn" id="gmPushBtn" style="display:none;">Push remaining to tomorrow</button>
+      <div class="gm-input-wrap goal-input-wrap">
+        <input type="text" id="goalInput" class="gm-input" placeholder="Add a goal for today…">
+        <button type="button" class="gm-btn gm-btn-primary" id="goalAddBtn">+ Add</button>
+        <button type="button" class="gm-btn gm-btn-secondary" id="goalPolishBtn">✨ Polish</button>
+      </div>
+      <div class="gm-status-line" id="polishStatus"></div>
+    </div>
+
+    <div class="gm-card gm-card-tomorrow" id="tomorrowCard">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow" id="tomorrowLabel">Plan tomorrow — </div>
+          <div class="gm-sub">Write tonight, locked until 6 AM.</div>
+        </div>
+        <div class="gm-count-badge" id="gmTomorrowCount">0 planned</div>
+      </div>
+      <ul id="tomorrowList" class="goal-list gm-list"></ul>
+      <div id="tomorrowEmptyState" class="empty-state">Nothing planned for tomorrow yet</div>
+      <div class="gm-input-wrap goal-input-wrap">
+        <input type="text" id="tomorrowInput" class="gm-input" placeholder="Add a goal for tomorrow…">
+        <button type="button" class="gm-btn gm-btn-primary" id="tomorrowAddBtn">+ Add</button>
+        <button type="button" class="gm-btn gm-btn-secondary" id="tomorrowPolishBtn">✨ Polish</button>
+      </div>
+      <div class="gm-status-line" id="tomorrowStatus"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var WAKE_HOUR = 8;
+  var SLEEP_HOUR = 24;
+  var ANTHROPIC_API_KEY = '';
+
+  var SUPABASE_URL = 'https://eliwawvkkcamntciekhd.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_HLgA595j21f-RVPwR8zGFg_8LjGJnq0';
+
+  /* ---------- storage helpers ---------- */
+  function storeGet(key) {
+    var raw = localStorage.getItem(key);
+    if (raw === null) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+  function storeSet(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+    supaUpsert(key, value);
+  }
+  function storeDelete(key) {
+    localStorage.removeItem(key);
+    supaDelete(key);
+  }
+  function storeListKeys(prefix) {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(prefix) === 0) keys.push(k);
+    }
+    return keys;
+  }
+
+  /* ---------- Supabase sync (app_state table: key text primary key, data jsonb) ---------- */
+  function supaReady() {
+    return !!SUPABASE_URL && !!SUPABASE_KEY && SUPABASE_URL.indexOf('YOUR-PROJECT') === -1;
+  }
+  function supaHeaders(extra) {
+    var h = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+  function supaUpsert(key, value) {
+    if (!supaReady()) return;
+    fetch(SUPABASE_URL + '/rest/v1/app_state', {
+      method: 'POST',
+      headers: supaHeaders({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ key: key, data: value, updated_at: new Date().toISOString() })
+    }).catch(function () { /* offline-tolerant: local write already succeeded */ });
+  }
+  function supaDelete(key) {
+    if (!supaReady()) return;
+    fetch(SUPABASE_URL + '/rest/v1/app_state?key=eq.' + encodeURIComponent(key), {
+      method: 'DELETE',
+      headers: supaHeaders()
+    }).catch(function () {});
+  }
+  function supaFetchAll() {
+    if (!supaReady()) return Promise.resolve([]);
+    return fetch(SUPABASE_URL + '/rest/v1/app_state?select=key,data', {
+      headers: supaHeaders()
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Supabase fetch failed');
+      return res.json();
+    }).catch(function () { return []; });
+  }
+  function pullFromSupabase() {
+    return supaFetchAll().then(function (rows) {
+      rows.forEach(function (row) {
+        localStorage.setItem(row.key, JSON.stringify(row.data));
+      });
+    });
+  }
+  function startSupabasePolling() {
+    if (!supaReady()) return;
+    setInterval(function () {
+      pullFromSupabase().then(function () {
+        loadToday();
+        loadTomorrow();
+        renderStreak();
+        window.dispatchEvent(new CustomEvent('goals-changed'));
+      });
+    }, 15000);
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function dateToStr(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function getActiveDateString() {
+    var now = new Date();
+    if (now.getHours() < 6) now.setDate(now.getDate() - 1);
+    return dateToStr(now);
+  }
+  function getTomorrowDateString() {
+    var now = new Date();
+    if (now.getHours() < 6) return dateToStr(now);
+    now.setDate(now.getDate() + 1);
+    return dateToStr(now);
+  }
+  function formatDate(str) {
+    var parts = str.split('-').map(Number);
+    var dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    var weekday = dt.toLocaleDateString(undefined, { weekday: 'short' });
+    var month = dt.toLocaleDateString(undefined, { month: 'short' });
+    return weekday + ', ' + month + ' ' + dt.getDate();
+  }
+  function goalsKey(dateStr) { return 'goals:' + dateStr; }
+
+  /* ---------- streak check (must run before rollover deletes old records) ---------- */
+  function checkStreak() {
+    var activeDate = getActiveDateString();
+    var streak = storeGet('goal_streak_v1') || { count: 0, lastProcessedDate: null };
+    var keys = storeListKeys('goals:')
+      .map(function (k) { return k.slice('goals:'.length); })
+      .filter(function (d) { return d < activeDate; })
+      .filter(function (d) { return !streak.lastProcessedDate || d > streak.lastProcessedDate; })
+      .sort();
+    keys.forEach(function (dateStr) {
+      var goals = storeGet(goalsKey(dateStr)) || [];
+      if (goals.length === 0) {
+        /* skip, don't break the streak */
+      } else if (goals.every(function (g) { return g.done; })) {
+        streak.count += 1;
+      } else {
+        streak.count = 0;
+      }
+      streak.lastProcessedDate = dateStr;
+    });
+    storeSet('goal_streak_v1', streak);
+  }
+
+  /* ---------- rollover ---------- */
+  function rollover() {
+    var activeDate = getActiveDateString();
+    var todayKeyStr = goalsKey(activeDate);
+    var today = storeGet(todayKeyStr) || [];
+    var changed = false;
+    storeListKeys('goals:').forEach(function (key) {
+      var dateStr = key.slice('goals:'.length);
+      if (dateStr < activeDate) {
+        var goals = storeGet(key) || [];
+        goals.filter(function (g) { return !g.done; }).forEach(function (g) {
+          if (!today.some(function (t) { return t.text === g.text; })) {
+            today.push({ text: g.text, done: false });
+            changed = true;
+          }
+        });
+        storeDelete(key);
+      }
+    });
+    if (changed) storeSet(todayKeyStr, today);
+  }
+
+  /* ---------- day ring ---------- */
+  var RING_R = 52;
+  var RING_C = 2 * Math.PI * RING_R;
+  var SUN_STOPS = [
+    [0,    [255, 216, 158]],
+    [12.5, [255, 205, 121]],
+    [25,   [255, 227, 143]],
+    [37.5, [255, 183, 106]],
+    [50,   [255, 149,  89]],
+    [62.5, [243, 111,  79]],
+    [75,   [226,  93, 122]],
+    [87.5, [123,  91, 176]],
+    [100,  [ 47,  58, 102]]
+  ];
+
+  function interpolateColor(percent) {
+    var lo = SUN_STOPS[0], hi = SUN_STOPS[SUN_STOPS.length - 1];
+    for (var i = 0; i < SUN_STOPS.length - 1; i++) {
+      if (percent >= SUN_STOPS[i][0] && percent <= SUN_STOPS[i + 1][0]) {
+        lo = SUN_STOPS[i]; hi = SUN_STOPS[i + 1]; break;
+      }
+    }
+    var span = hi[0] - lo[0];
+    var t = span === 0 ? 0 : (percent - lo[0]) / span;
+    var c = lo[1].map(function (v, idx) { return Math.round(v + (hi[1][idx] - v) * t); });
+    return 'rgb(' + c.join(',') + ')';
+  }
+
+  function formatClock(now) {
+    var h = now.getHours();
+    var m = now.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return h + ':' + pad2(m) + ' ' + ampm;
+  }
+
+  function formatDuration(hoursFloat) {
+    var totalMin = Math.max(0, Math.round(hoursFloat * 60));
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    return h + 'h ' + m + 'm';
+  }
+
+  var dayRingFill = document.getElementById('dayRingFill');
+  var dayRingPercentEl = document.getElementById('dayRingPercent');
+  var dayRingPhaseEl = document.getElementById('dayRingPhase');
+  var dayRingClockEl = document.getElementById('dayRingClock');
+  var dayRingStatusEl = document.getElementById('dayRingStatus');
+  var dayRingRemainingEl = document.getElementById('dayRingRemaining');
+
+  dayRingFill.setAttribute('stroke-dasharray', String(RING_C));
+
+  function updateDayBar() {
+    var now = new Date();
+    var hours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    dayRingClockEl.textContent = formatClock(now);
+
+    if (hours < WAKE_HOUR) {
+      dayRingFill.style.stroke = '#4D4B47';
+      dayRingFill.style.strokeDashoffset = String(RING_C);
+      dayRingPercentEl.textContent = '—';
+      dayRingPhaseEl.textContent = 'SLEEPING';
+      dayRingStatusEl.textContent = '😴 Still sleeping';
+      dayRingRemainingEl.textContent = formatDuration(WAKE_HOUR - hours) + ' until wake-up';
+    } else if (hours < SLEEP_HOUR) {
+      var percent = (hours - WAKE_HOUR) / (SLEEP_HOUR - WAKE_HOUR) * 100;
+      dayRingFill.style.strokeDashoffset = String(RING_C * (1 - percent / 100));
+      dayRingFill.style.stroke = interpolateColor(percent);
+      dayRingPercentEl.textContent = Math.round(percent) + '%';
+      var phase, status;
+      if (percent < 25) { phase = 'MORNING'; status = '☀️ Morning — fresh start'; }
+      else if (percent < 50) { phase = 'MIDDAY'; status = '⚡ Midday — keep moving'; }
+      else if (percent < 75) { phase = 'AFTERNOON'; status = '🔥 Afternoon — push it'; }
+      else if (percent < 90) { phase = 'EVENING'; status = '⏳ Evening — wrap up'; }
+      else { phase = 'BEDTIME'; status = '🌙 Bedtime soon'; }
+      dayRingPhaseEl.textContent = phase;
+      dayRingStatusEl.textContent = status;
+      dayRingRemainingEl.textContent = formatDuration(SLEEP_HOUR - hours) + ' awake time left';
+    } else {
+      dayRingFill.style.stroke = '#E25D7A';
+      dayRingFill.style.strokeDashoffset = '0';
+      dayRingPercentEl.textContent = '100%';
+      dayRingPhaseEl.textContent = 'PAST BEDTIME';
+      dayRingStatusEl.textContent = '⚠️ Past bedtime';
+      dayRingRemainingEl.textContent = 'Sleep!';
+    }
+  }
+
+  /* ---------- goal ticker ---------- */
+  var goalTickerStage = document.getElementById('goalTickerStage');
+  var goalTickerMeta = document.getElementById('goalTickerMeta');
+  var cycleIdx = 0;
+  var tickerInterval = null;
+  var STATUS_GLYPH = { done: '✓', pending: '○' };
+
+  function buildTickerItems() {
+    var goals = storeGet(goalsKey(getActiveDateString())) || [];
+    var total = goals.length;
+    var done = goals.filter(function (g) { return g.done; }).length;
+    var items;
+    if (total === 0) {
+      items = [{ status: 'empty', text: 'No goals set for today — add one to get rolling.' }];
+    } else if (done === total) {
+      items = [{ status: 'done', text: '✓ All goals done — solid day.' }];
+    } else {
+      items = goals.filter(function (g) { return !g.done; }).map(function (g) {
+        return { status: 'pending', text: g.text };
+      });
+    }
+    return { items: items, done: done, total: total };
+  }
+
+  function renderTickerRow(item, animClass) {
+    var row = document.createElement('div');
+    row.className = 'goal-ticker-row' + (animClass ? ' ' + animClass : '');
+    var statusSpan = document.createElement('span');
+    statusSpan.className = 'goal-ticker-status';
+    statusSpan.setAttribute('data-status', item.status);
+    statusSpan.textContent = STATUS_GLYPH[item.status] || '·';
+    var textSpan = document.createElement('span');
+    textSpan.className = 'goal-ticker-text';
+    textSpan.textContent = item.text;
+    row.appendChild(statusSpan);
+    row.appendChild(textSpan);
+    goalTickerStage.appendChild(row);
+    return row;
+  }
+
+  function tick() {
+    var data = buildTickerItems();
+    var items = data.items;
+    if (cycleIdx >= items.length) cycleIdx = 0;
+    var item = items[cycleIdx];
+    var existing = goalTickerStage.querySelector('.goal-ticker-row');
+    if (existing) {
+      existing.classList.add('is-leaving');
+      setTimeout(function () {
+        if (existing.parentNode) existing.parentNode.removeChild(existing);
+      }, 460);
+      renderTickerRow(item, 'is-entering');
+    } else {
+      renderTickerRow(item, null);
+    }
+    goalTickerMeta.textContent = data.done + '/' + data.total;
+    cycleIdx = (cycleIdx + 1) % items.length;
+  }
+
+  function startTicker() {
+    goalTickerStage.innerHTML = '';
+    tick();
+    if (tickerInterval) clearInterval(tickerInterval);
+    tickerInterval = setInterval(tick, 5000);
+  }
+
+  window.addEventListener('goals-changed', function () {
+    cycleIdx = 0;
+    tick();
+  });
+
+  /* ---------- to do list ---------- */
+  var todayLabel = document.getElementById('todayLabel');
+  var gmProgressNum = document.getElementById('gmProgressNum');
+  var gmProgressTotal = document.getElementById('gmProgressTotal');
+  var gmProgressLabel = document.getElementById('gmProgressLabel');
+  var gmStreak = document.getElementById('gmStreak');
+  var gmStreakNum = document.getElementById('gmStreakNum');
+  var gmBar = document.getElementById('gmBar');
+  var goalListEl = document.getElementById('goalList');
+  var emptyStateEl = document.getElementById('emptyState');
+  var gmPushBtn = document.getElementById('gmPushBtn');
+  var todayCard = document.getElementById('todayCard');
+
+  var tomorrowLabel = document.getElementById('tomorrowLabel');
+  var gmTomorrowCount = document.getElementById('gmTomorrowCount');
+  var tomorrowListEl = document.getElementById('tomorrowList');
+  var tomorrowEmptyStateEl = document.getElementById('tomorrowEmptyState');
+
+  var todayExpanded = false;
+  var tomorrowExpanded = false;
+  var dragSrcIdx = null;
+
+  function currentTodayKey() { return goalsKey(getActiveDateString()); }
+  function currentTomorrowKey() { return goalsKey(getTomorrowDateString()); }
+
+  function saveGoals(key, goals) {
+    storeSet(key, goals);
+    if (key.indexOf('goals:') === 0) {
+      window.dispatchEvent(new CustomEvent('goals-changed'));
+    }
+  }
+
+  function renderTodayHeader() {
+    var goals = storeGet(currentTodayKey()) || [];
+    var total = goals.length;
+    var done = goals.filter(function (g) { return g.done; }).length;
+    todayLabel.textContent = 'Today — ' + formatDate(getActiveDateString());
+    gmProgressNum.textContent = done;
+    gmProgressTotal.textContent = '/ ' + total;
+    if (total === 0) gmProgressLabel.textContent = 'no goals yet';
+    else if (done === total) gmProgressLabel.textContent = 'all done — solid day';
+    else gmProgressLabel.textContent = 'complete';
+
+    gmBar.innerHTML = '';
+    goals.forEach(function (g) {
+      var seg = document.createElement('div');
+      seg.className = 'gm-bar-seg' + (g.done ? ' gm-bar-seg-done' : '');
+      gmBar.appendChild(seg);
+    });
+
+    todayCard.classList.toggle('gm-all-done', total > 0 && done === total);
+    var hasUnchecked = goals.some(function (g) { return !g.done; });
+    gmPushBtn.style.display = hasUnchecked ? '' : 'none';
+  }
+
+  function renderStreak() {
+    var streak = storeGet('goal_streak_v1') || { count: 0 };
+    gmStreakNum.textContent = streak.count || 0;
+    gmStreak.classList.toggle('gm-streak-active', (streak.count || 0) > 0);
+  }
+
+  function renderTomorrowCount() {
+    var goals = storeGet(currentTomorrowKey()) || [];
+    tomorrowLabel.textContent = 'Plan tomorrow — ' + formatDate(getTomorrowDateString());
+    gmTomorrowCount.textContent = goals.length + ' planned';
+  }
+
+  function makeInlineEdit(el, goal, key, goals) {
+    el.addEventListener('click', function () {
+      if (el.getAttribute('contenteditable') === 'true') return;
+      el.setAttribute('contenteditable', 'true');
+      el.focus();
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      function cleanup() {
+        el.removeEventListener('keydown', onKeydown);
+        el.removeEventListener('blur', onBlur);
+      }
+      function commit() {
+        el.removeAttribute('contenteditable');
+        var newText = el.textContent.trim();
+        if (newText && newText !== goal.text) {
+          goal.text = newText;
+          saveGoals(key, goals);
+        } else {
+          el.textContent = goal.text;
+        }
+        cleanup();
+      }
+      function cancel() {
+        el.removeAttribute('contenteditable');
+        el.textContent = goal.text;
+        cleanup();
+      }
+      function onKeydown(e) {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      }
+      function onBlur() { commit(); }
+
+      el.addEventListener('keydown', onKeydown);
+      el.addEventListener('blur', onBlur);
+    });
+  }
+
+  function wireDragReorder(li, idx, goals, key, reload) {
+    li.addEventListener('dragstart', function (e) {
+      dragSrcIdx = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(idx));
+    });
+    li.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      li.classList.add('is-drag-over');
+    });
+    li.addEventListener('dragleave', function () {
+      li.classList.remove('is-drag-over');
+    });
+    li.addEventListener('drop', function (e) {
+      e.preventDefault();
+      li.classList.remove('is-drag-over');
+      var from = dragSrcIdx, to = idx;
+      dragSrcIdx = null;
+      if (from === null || from === to) return;
+      var moved = goals.splice(from, 1)[0];
+      goals.splice(to, 0, moved);
+      saveGoals(key, goals);
+      reload();
+    });
+    li.addEventListener('dragend', function () {
+      li.classList.remove('is-drag-over');
+      dragSrcIdx = null;
+    });
+  }
+
+  function buildGoalRow(goal, idx, goals, key, readOnly, reload) {
+    var li = document.createElement('li');
+    li.className = 'goal-row';
+    if (goal.done) li.classList.add('is-done');
+    if (goal.queued) li.classList.add('is-queued');
+    li.draggable = !readOnly;
+
+    var handle = document.createElement('span');
+    handle.className = 'goal-drag-handle';
+    handle.textContent = '⋮⋮';
+    li.appendChild(handle);
+
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'goal-checkbox';
+    cb.checked = !!goal.done;
+    if (readOnly) { cb.disabled = true; cb.title = 'Activates at 6 AM tomorrow'; }
+    cb.addEventListener('change', function () {
+      goal.done = cb.checked;
+      if (cb.checked) goal.doneAt = Date.now();
+      else delete goal.doneAt;
+      saveGoals(key, goals);
+      reload();
+    });
+    li.appendChild(cb);
+
+    var text = document.createElement('span');
+    text.className = 'goal-text';
+    text.textContent = goal.text;
+    makeInlineEdit(text, goal, key, goals);
+    li.appendChild(text);
+
+    var queueBtn = document.createElement('button');
+    queueBtn.type = 'button';
+    queueBtn.className = 'gm-queue-btn' + (goal.queued ? ' gm-queue-active' : '');
+    queueBtn.textContent = '⚡';
+    if (readOnly) queueBtn.disabled = true;
+    queueBtn.addEventListener('click', function () {
+      goal.queued = !goal.queued;
+      saveGoals(key, goals);
+      li.classList.add('is-queue-flashing');
+      setTimeout(function () { reload(); }, 480);
+    });
+    li.appendChild(queueBtn);
+
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'goal-delete';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', function () {
+      var at = goals.indexOf(goal);
+      if (at !== -1) goals.splice(at, 1);
+      saveGoals(key, goals);
+      reload();
+    });
+    li.appendChild(delBtn);
+
+    if (!readOnly) wireDragReorder(li, idx, goals, key, reload);
+
+    return li;
+  }
+
+  function renderListInto(goals, listEl, emptyEl, key, readOnly, getExpanded, setExpanded, reload, headerRenderers) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = goals.length === 0 ? '' : 'none';
+
+    var expanded = getExpanded();
+    var visibleCount = (goals.length > 5 && !expanded) ? 5 : goals.length;
+
+    for (var i = 0; i < visibleCount; i++) {
+      listEl.appendChild(buildGoalRow(goals[i], i, goals, key, readOnly, reload));
+    }
+
+    if (goals.length > 5) {
+      var toggleLi = document.createElement('li');
+      toggleLi.style.listStyle = 'none';
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'gm-show-more';
+      var remaining = goals.length - 5;
+      toggle.textContent = expanded ? 'Show less ▴' : ('Show ' + remaining + ' more ▾');
+      toggle.addEventListener('click', function () {
+        setExpanded(!expanded);
+        reload();
+      });
+      toggleLi.appendChild(toggle);
+      listEl.appendChild(toggleLi);
+    }
+
+    headerRenderers.forEach(function (fn) { fn(); });
+  }
+
+  function loadToday() {
+    var key = currentTodayKey();
+    var goals = storeGet(key) || [];
+    renderListInto(goals, goalListEl, emptyStateEl, key, false,
+      function () { return todayExpanded; },
+      function (v) { todayExpanded = v; },
+      loadToday,
+      [renderTodayHeader]);
+  }
+
+  function loadTomorrow() {
+    var key = currentTomorrowKey();
+    var goals = storeGet(key) || [];
+    renderListInto(goals, tomorrowListEl, tomorrowEmptyStateEl, key, true,
+      function () { return tomorrowExpanded; },
+      function (v) { tomorrowExpanded = v; },
+      loadTomorrow,
+      [renderTomorrowCount]);
+  }
+
+  gmPushBtn.addEventListener('click', function () {
+    if (!confirm('Push all remaining goals to tomorrow?')) return;
+    var todayKeyStr = currentTodayKey();
+    var tomorrowKeyStr = currentTomorrowKey();
+    var todayGoals = storeGet(todayKeyStr) || [];
+    var tomorrowGoals = storeGet(tomorrowKeyStr) || [];
+    todayGoals.filter(function (g) { return !g.done; }).forEach(function (g) {
+      if (!tomorrowGoals.some(function (t) { return t.text === g.text; })) {
+        tomorrowGoals.push({ text: g.text, done: false });
+      }
+    });
+    var remaining = todayGoals.filter(function (g) { return g.done; });
+    storeSet(tomorrowKeyStr, tomorrowGoals);
+    saveGoals(todayKeyStr, remaining);
+    loadToday();
+    loadTomorrow();
+  });
+
+  function makeAddHandlers(input, addBtn, polishBtn, keyFn, statusEl, reload) {
+    function showStatus(msg, isError) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle('is-error', !!isError);
+      setTimeout(function () {
+        statusEl.textContent = '';
+        statusEl.classList.remove('is-error');
+      }, 3500);
+    }
+
+    function doAdd() {
+      var text = input.value.trim();
+      if (!text) return;
+      var key = keyFn();
+      var goals = storeGet(key) || [];
+      goals.push({ text: text, done: false });
+      saveGoals(key, goals);
+      input.value = '';
+      reload();
+    }
+
+    function doPolish() {
+      var text = input.value.trim();
+      if (!text) return;
+      var key = keyFn();
+
+      if (!ANTHROPIC_API_KEY) {
+        var goals = storeGet(key) || [];
+        goals.push({ text: text, done: false });
+        saveGoals(key, goals);
+        input.value = '';
+        reload();
+        showStatus('Polish needs an Anthropic API key — added as-typed.', false);
+        return;
+      }
+
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: 'Clean up and polish exactly ONE to-do goal for clarity and concision. Return ONLY a JSON array containing a single string — no preamble, no code fences, no explanation.\n\nGoal: ' + text
+          }]
+        })
+      }).then(function (res) {
+        if (!res.ok) throw new Error('Request failed');
+        return res.json();
+      }).then(function (data) {
+        var raw = data.content && data.content[0] && data.content[0].text;
+        var parsed = JSON.parse(raw);
+        var polished = Array.isArray(parsed) ? parsed[0] : String(parsed);
+        var goals = storeGet(key) || [];
+        goals.push({ text: polished, done: false });
+        saveGoals(key, goals);
+        input.value = '';
+        reload();
+      }).catch(function () {
+        var goals = storeGet(key) || [];
+        goals.push({ text: text, done: false });
+        saveGoals(key, goals);
+        input.value = '';
+        reload();
+        showStatus('Polish failed — added as-typed.', true);
+      });
+    }
+
+    addBtn.addEventListener('click', doAdd);
+    polishBtn.addEventListener('click', doPolish);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+    });
+  }
+
+  var goalInput = document.getElementById('goalInput');
+  var goalAddBtn = document.getElementById('goalAddBtn');
+  var goalPolishBtn = document.getElementById('goalPolishBtn');
+  var polishStatus = document.getElementById('polishStatus');
+
+  var tomorrowInput = document.getElementById('tomorrowInput');
+  var tomorrowAddBtn = document.getElementById('tomorrowAddBtn');
+  var tomorrowPolishBtn = document.getElementById('tomorrowPolishBtn');
+  var tomorrowStatus = document.getElementById('tomorrowStatus');
+
+  makeAddHandlers(goalInput, goalAddBtn, goalPolishBtn, currentTodayKey, polishStatus, loadToday);
+  makeAddHandlers(tomorrowInput, tomorrowAddBtn, tomorrowPolishBtn, currentTomorrowKey, tomorrowStatus, loadTomorrow);
+
+  /* ---------- init ---------- */
+  pullFromSupabase().then(function () {
+    checkStreak();
+    rollover();
+
+    loadToday();
+    loadTomorrow();
+    renderStreak();
+
+    startTicker();
+
+    updateDayBar();
+    setInterval(updateDayBar, 60 * 1000);
+
+    startSupabasePolling();
+  });
+
+})();
+</script>
+</body>
+</html>
