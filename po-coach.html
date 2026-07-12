@@ -153,22 +153,25 @@ img, video, canvas, svg { max-width: 100%; }
   display: flex;
   width: 100%;
   max-width: 460px;
-  gap: 6px;
+  gap: 4px;
   padding: 6px;
   background: rgba(20, 20, 22, 0.72);
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none;
 }
+.tabbar-inner::-webkit-scrollbar { display: none; }
 .tab {
   flex: 1 1 0;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 12px 10px;
   border-radius: 13px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-2);
@@ -179,6 +182,7 @@ img, video, canvas, svg { max-width: 100%; }
   -webkit-tap-highlight-color: transparent;
 }
 .tab:hover { color: var(--text-1); }
+.tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tab[aria-current="page"] {
   color: var(--text-1);
   background: rgba(255,255,255,0.06);
@@ -187,11 +191,16 @@ img, video, canvas, svg { max-width: 100%; }
 .tab-icon {
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .tab-icon svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 420px) {
+  .tab { padding: 10px 6px; font-size: 11px; gap: 4px; }
+  .tab-icon { width: 16px; height: 16px; }
+}
 .po-day-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 6px 12px;
@@ -725,8 +734,8 @@ img, video, canvas, svg { max-width: 100%; }
   /* Progress photos grid — match the available width */
   .wt-photo-grid { gap: 8px; }
 
-  /* Bottom tab bar — slightly smaller pills so both labels always fit */
-  .tab { padding: 11px 10px; font-size: 13px; }
+  /* Bottom tab bar sizing lives in the shared @media (max-width: 420px) rule
+     near .tab-icon so it doesn't fight that breakpoint's cascade order. */
   .tabbar { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
 }
 
@@ -3487,31 +3496,31 @@ img, video, canvas, svg { max-width: 100%; }
       <span class="tab-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
       </span>
-      Dashboard
+      <span class="tab-label">Dashboard</span>
     </a>
     <a class="tab" href="health.html">
       <span class="tab-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
       </span>
-      Health
+      <span class="tab-label">Health</span>
     </a>
     <a class="tab" href="po-water.html">
       <span class="tab-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
       </span>
-      Water
+      <span class="tab-label">Water</span>
     </a>
     <a class="tab" href="po-coach.html" aria-current="page">
       <span class="tab-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M20.5 3.5l-3 3M3.5 20.5l3-3M17.5 6.5l-3-3M6.5 17.5l-3 3M6.5 6.5l-3-3M17.5 17.5l3 3M17.5 6.5l3-3"/></svg>
       </span>
-      Coach
+      <span class="tab-label">Coach</span>
     </a>
     <a class="tab" href="finance.html">
       <span class="tab-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1.1 1.1-2 2.5-2s2.5.9 2.5 2c0 2.2-5 1.3-5 3.5 0 1.1 1.1 2 2.5 2s2.5-.9 2.5-2"/></svg>
       </span>
-      Finance
+      <span class="tab-label">Finance</span>
     </a>
   </div>
 </nav>
