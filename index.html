@@ -354,6 +354,212 @@
   .gm-status-line { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; min-height: 14px; }
   .gm-status-line.is-error { color: var(--danger); }
 </style>
+
+<!-- SKYOS:PRAYER:STYLE:START -->
+<style>
+  :root {
+    --pr-glass: rgba(17, 22, 38, 0.78);
+    --pr-glass-soft: rgba(255, 255, 255, 0.045);
+    --pr-border: rgba(255, 255, 255, 0.10);
+    --pr-text: #e9edf6;
+    --pr-dim: #8b93a8;
+    --pr-gold: #e7c37c;       /* aktives Gebet / Akzent */
+    --pr-green: #4ade9b;      /* erledigt */
+    --pr-amber: #f0a95c;      /* nachgeholt (Qada) */
+    --pr-red: #ff5468;        /* verpasst */
+    --pr-radius: 18px;
+    --pr-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* ── Side-Tab am rechten Rand ── */
+  .pr-tab {
+    position: fixed; right: 0; top: 42%;
+    z-index: 900;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 14px 9px 12px;
+    background: var(--pr-glass);
+    border: 1px solid var(--pr-border); border-right: none;
+    border-radius: 14px 0 0 14px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    color: var(--pr-gold);
+    cursor: pointer;
+    font-family: var(--pr-font);
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  .pr-tab:hover { transform: translateX(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+  .pr-tab svg { width: 22px; height: 22px; display: block; }
+  .pr-tab .pr-tab-label {
+    writing-mode: vertical-rl;
+    font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--pr-dim);
+  }
+  .pr-tab .pr-badge {
+    position: absolute; top: 6px; left: 4px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 999px;
+    background: var(--pr-red); color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 0 10px rgba(255, 84, 104, .8);
+  }
+  .pr-tab .pr-badge.show { display: flex; }
+  .pr-tab .pr-badge.due { background: var(--pr-gold); color: #1a1508; box-shadow: 0 0 10px rgba(231,195,124,.7); }
+
+  /* ── Panel ── */
+  .pr-panel {
+    position: fixed; right: 0; top: 0; bottom: 0;
+    z-index: 950;
+    width: min(360px, 92vw);
+    display: flex; flex-direction: column;
+    background: var(--pr-glass);
+    border-left: 1px solid var(--pr-border);
+    backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+    color: var(--pr-text);
+    font-family: var(--pr-font);
+    transform: translateX(105%);
+    transition: transform .32s cubic-bezier(.32,.9,.35,1);
+    box-shadow: -18px 0 50px rgba(0,0,0,.45);
+  }
+  .pr-panel.open { transform: translateX(0); }
+
+  .pr-head {
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid var(--pr-border);
+  }
+  .pr-head-row { display: flex; align-items: center; justify-content: space-between; }
+  .pr-title { font-size: 17px; font-weight: 700; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+  .pr-title svg { width: 18px; height: 18px; color: var(--pr-gold); }
+  .pr-head-btns { display: flex; gap: 6px; }
+  .pr-icon-btn {
+    background: var(--pr-glass-soft); border: 1px solid var(--pr-border);
+    color: var(--pr-dim); border-radius: 10px;
+    width: 30px; height: 30px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .2s;
+  }
+  .pr-icon-btn:hover { color: var(--pr-text); }
+  .pr-dates { margin-top: 6px; font-size: 12px; color: var(--pr-dim); line-height: 1.5; }
+  .pr-streak { margin-top: 8px; font-size: 12px; color: var(--pr-gold); display: none; }
+  .pr-streak.show { display: block; }
+
+  /* ── Nächstes Gebet (Ring) ── */
+  .pr-next {
+    display: flex; align-items: center; gap: 16px;
+    margin: 16px 16px 6px; padding: 14px 16px;
+    background: var(--pr-glass-soft);
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius);
+  }
+  .pr-ring { width: 74px; height: 74px; flex-shrink: 0; }
+  .pr-ring circle { fill: none; stroke-width: 5; }
+  .pr-ring .pr-ring-bg { stroke: rgba(255,255,255,.08); }
+  .pr-ring .pr-ring-fg {
+    stroke: var(--pr-gold); stroke-linecap: round;
+    transform: rotate(-90deg); transform-origin: 50% 50%;
+    transition: stroke-dashoffset .6s ease;
+  }
+  .pr-ring text { fill: var(--pr-text); font-size: 13px; font-weight: 700; text-anchor: middle; font-family: var(--pr-font); }
+  .pr-next-info .pr-next-label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--pr-dim); }
+  .pr-next-info .pr-next-name { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  .pr-next-info .pr-next-time { font-size: 13px; color: var(--pr-gold); margin-top: 2px; }
+
+  /* ── Gebetsliste ── */
+  .pr-list { list-style: none; margin: 10px 0 0; padding: 0 16px; flex: 1; overflow-y: auto; }
+  .pr-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px; margin-bottom: 8px;
+    background: var(--pr-glass-soft);
+    border: 1px solid var(--pr-border);
+    border-radius: 14px;
+    transition: border-color .25s, box-shadow .25s, opacity .25s;
+  }
+  .pr-row.upcoming { opacity: .55; }
+  .pr-row.active { border-color: rgba(231,195,124,.55); box-shadow: 0 0 16px rgba(231,195,124,.12) inset, 0 0 14px rgba(231,195,124,.15); opacity: 1; }
+  .pr-row.missed {
+    border-color: rgba(255,84,104,.65);
+    animation: prPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes prPulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(255,84,104,.15); }
+    50%      { box-shadow: 0 0 18px rgba(255,84,104,.55); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pr-row.missed { animation: none; box-shadow: 0 0 14px rgba(255,84,104,.4); }
+    .pr-panel { transition: none; }
+  }
+
+  .pr-check {
+    width: 26px; height: 26px; flex-shrink: 0;
+    border: 1.5px solid var(--pr-dim); border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 15px; color: transparent;
+    transition: all .2s;
+    user-select: none;
+  }
+  .pr-check.disabled { opacity: .3; cursor: not-allowed; }
+  .pr-row.done .pr-check { background: rgba(74,222,155,.15); border-color: var(--pr-green); color: var(--pr-green); }
+  .pr-row.qada .pr-check { background: rgba(240,169,92,.15); border-color: var(--pr-amber); color: var(--pr-amber); }
+  .pr-row.missed .pr-check { border-color: var(--pr-red); }
+
+  .pr-names { flex: 1; min-width: 0; }
+  .pr-name { font-size: 15px; font-weight: 600; }
+  .pr-row.done .pr-name { text-decoration: line-through; text-decoration-color: rgba(74,222,155,.6); }
+  .pr-sub { display: block; font-size: 11px; color: var(--pr-dim); margin-top: 1px; }
+  .pr-ar {
+    font-size: 15px; color: var(--pr-dim); opacity: .55;
+    font-family: "Amiri", "Scheherazade New", serif;
+  }
+  .pr-row.active .pr-ar { color: var(--pr-gold); opacity: .9; }
+  .pr-time { font-size: 14px; font-variant-numeric: tabular-nums; color: var(--pr-text); width: 46px; text-align: right; }
+  .pr-state-tag { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+  .pr-row.missed .pr-state-tag { color: var(--pr-red); }
+  .pr-row.qada .pr-state-tag { color: var(--pr-amber); }
+
+  /* Sonnenaufgang = Marker, kein Gebet */
+  .pr-row.marker { padding: 7px 12px; opacity: .5; background: transparent; border-style: dashed; }
+  .pr-row.marker .pr-name { font-size: 12px; font-weight: 500; color: var(--pr-dim); }
+  .pr-row.marker .pr-time { font-size: 12px; color: var(--pr-dim); }
+  .pr-marker-icon { width: 26px; text-align: center; color: var(--pr-gold); opacity: .7; flex-shrink: 0; }
+
+  /* ── Fortschritt / Fußzeile ── */
+  .pr-foot { padding: 12px 20px 18px; border-top: 1px solid var(--pr-border); }
+  .pr-progress { display: flex; gap: 5px; margin-bottom: 8px; }
+  .pr-seg { flex: 1; height: 5px; border-radius: 99px; background: rgba(255,255,255,.09); }
+  .pr-seg.on { background: var(--pr-green); box-shadow: 0 0 8px rgba(74,222,155,.5); }
+  .pr-seg.q { background: var(--pr-amber); }
+  .pr-foot-text { font-size: 12px; color: var(--pr-dim); }
+
+  /* ── Einstellungen ── */
+  .pr-settings { display: none; padding: 14px 20px; border-top: 1px solid var(--pr-border); max-height: 46vh; overflow-y: auto; }
+  .pr-settings.open { display: block; }
+  .pr-settings label { display: block; font-size: 11px; color: var(--pr-dim); margin: 10px 0 4px; letter-spacing: .05em; text-transform: uppercase; }
+  .pr-settings input, .pr-settings select {
+    width: 100%; box-sizing: border-box;
+    background: rgba(255,255,255,.06); border: 1px solid var(--pr-border);
+    color: var(--pr-text); border-radius: 10px;
+    padding: 8px 10px; font-size: 13px; font-family: var(--pr-font);
+  }
+  .pr-settings .pr-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pr-settings .pr-offsets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pr-settings .pr-hint { font-size: 11px; color: var(--pr-dim); margin-top: 10px; line-height: 1.5; }
+  .pr-btn {
+    margin-top: 14px; width: 100%;
+    background: rgba(231,195,124,.14); border: 1px solid rgba(231,195,124,.4);
+    color: var(--pr-gold); border-radius: 12px;
+    padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: var(--pr-font);
+  }
+  .pr-btn.ghost { background: transparent; border-color: var(--pr-border); color: var(--pr-dim); margin-top: 8px; }
+
+  /* Side-Tab darf auf schmalen Screens nicht mit der oberen Quick-Stats-
+     Leiste oder der unteren Tab-Bar kollidieren â bei knapper Hoehe
+     etwas hoeher ansetzen, damit er sicher in der Mitte bleibt. */
+  @media (max-height: 700px) {
+    .pr-tab { top: 38%; }
+  }
+</style>
+<!-- SKYOS:PRAYER:STYLE:END -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="topbar.js" defer></script>
 </head>
@@ -1217,5 +1423,489 @@
     </a>
   </div>
 </nav>
+
+<!-- SKYOS:PRAYER:MARKUP:START -->
+<!-- Tab-Button (rechter Rand) -->
+<button class="pr-tab" id="prTab" aria-label="Gebetszeiten öffnen">
+  <span class="pr-badge" id="prBadge">0</span>
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M20.6 14.6A8.6 8.6 0 0 1 9.4 3.4 9 9 0 1 0 20.6 14.6Z"/>
+  </svg>
+  <span class="pr-tab-label">Gebete</span>
+</button>
+
+<!-- Panel -->
+<aside class="pr-panel" id="prPanel" aria-label="Tägliche Gebete">
+  <div class="pr-head">
+    <div class="pr-head-row">
+      <div class="pr-title">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M20.6 14.6A8.6 8.6 0 0 1 9.4 3.4 9 9 0 1 0 20.6 14.6Z"/>
+        </svg>
+        Gebete
+      </div>
+      <div class="pr-head-btns">
+        <button class="pr-icon-btn" id="prGear" title="Einstellungen">⚙</button>
+        <button class="pr-icon-btn" id="prClose" title="Schließen">×</button>
+      </div>
+    </div>
+    <div class="pr-dates" id="prDates"></div>
+    <div class="pr-streak" id="prStreak"></div>
+  </div>
+
+  <div class="pr-next" id="prNext">
+    <svg class="pr-ring" viewBox="0 0 80 80">
+      <circle class="pr-ring-bg" cx="40" cy="40" r="34"></circle>
+      <circle class="pr-ring-fg" id="prRingFg" cx="40" cy="40" r="34"></circle>
+      <text x="40" y="45" id="prRingText">—</text>
+    </svg>
+    <div class="pr-next-info">
+      <div class="pr-next-label">Nächstes Gebet</div>
+      <div class="pr-next-name" id="prNextName">—</div>
+      <div class="pr-next-time" id="prNextTime">—</div>
+    </div>
+  </div>
+
+  <ul class="pr-list" id="prList"></ul>
+
+  <div class="pr-settings" id="prSettings">
+    <label>Standort (Breite / Länge)</label>
+    <div class="pr-grid2">
+      <input type="number" step="0.0001" id="prLat">
+      <input type="number" step="0.0001" id="prLng">
+    </div>
+    <button class="pr-btn ghost" id="prLocate">📍 Aktuellen Standort verwenden</button>
+
+    <label>Berechnungsmethode</label>
+    <select id="prMethod">
+      <option value="diyanet">Diyanet / Türkei (18° / 17°)</option>
+      <option value="mwl">Muslim World League (18° / 17°)</option>
+      <option value="egypt">Ägyptische Behörde (19,5° / 17,5°)</option>
+      <option value="isna">ISNA (15° / 15°)</option>
+      <option value="uaq">Umm al-Qura (18,5° / Isha +90 min)</option>
+    </select>
+
+    <label>Asr-Berechnung</label>
+    <select id="prAsr">
+      <option value="2">Hanafi (Schattenfaktor 2)</option>
+      <option value="1">Standard / Schafi'i (Faktor 1)</option>
+    </select>
+
+    <label>Feinjustierung in Minuten (Fajr · Dhuhr · Asr / Maghrib · Isha · Sonnenaufg.)</label>
+    <div class="pr-offsets">
+      <input type="number" id="offFajr" placeholder="Fajr">
+      <input type="number" id="offDhuhr" placeholder="Dhuhr">
+      <input type="number" id="offAsr" placeholder="Asr">
+      <input type="number" id="offMaghrib" placeholder="Maghrib">
+      <input type="number" id="offIsha" placeholder="Isha">
+      <input type="number" id="offSunrise" placeholder="Sonne">
+    </div>
+    <div class="pr-hint">
+      Tipp: Vergleiche die Zeiten einmal mit deiner Moschee bzw. der
+      Diyanet-App und gleiche Abweichungen (Temkin) hier minutengenau an —
+      danach passt es dauerhaft, da die Berechnung astronomisch mitläuft.
+    </div>
+    <button class="pr-btn" id="prSave">Speichern</button>
+  </div>
+
+  <div class="pr-foot">
+    <div class="pr-progress" id="prProgress"></div>
+    <div class="pr-foot-text" id="prFootText"></div>
+  </div>
+</aside>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ──────── Konfiguration & Persistenz ──────── */
+  const LS_SETTINGS = "skyos.prayer.settings";
+  const LS_STREAK   = "skyos.prayer.streak";
+  const LS_LOG      = (d) => "skyos.prayer.log." + d;
+
+  const METHODS = {
+    diyanet: { fajr: 18,   isha: 17 },
+    mwl:     { fajr: 18,   isha: 17 },
+    egypt:   { fajr: 19.5, isha: 17.5 },
+    isna:    { fajr: 15,   isha: 15 },
+    uaq:     { fajr: 18.5, ishaInterval: 90 }
+  };
+
+  const PRAYERS = [
+    { key: "fajr",    name: "Fajr",    sub: "Morgengebet",     ar: "الفجر" },
+    { key: "sunrise", name: "Sonnenaufgang", sub: "Ende der Fajr-Zeit", ar: "الشروق", marker: true },
+    { key: "dhuhr",   name: "Dhuhr",   sub: "Mittagsgebet",    ar: "الظهر" },
+    { key: "asr",     name: "Asr",     sub: "Nachmittagsgebet", ar: "العصر" },
+    { key: "maghrib", name: "Maghrib", sub: "Abendgebet",      ar: "المغرب" },
+    { key: "isha",    name: "Isha",    sub: "Nachtgebet",      ar: "العشاء" }
+  ];
+  const CHECKABLE = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+
+  const defaults = {
+    lat: 47.8151, lng: 16.2461,           // Wiener Neustadt
+    method: "diyanet", asrFactor: 2,
+    off: { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 }
+  };
+
+  let settings = loadSettings();
+  let todayKey = dateKey(new Date());
+  let times = null;          // heutige Zeiten (Date-Objekte)
+  let timesTomorrow = null;  // für Isha-Ende & Countdown nach Isha
+
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem(LS_SETTINGS));
+      if (s && typeof s.lat === "number") return Object.assign({}, defaults, s, { off: Object.assign({}, defaults.off, s.off || {}) });
+    } catch (e) { /* ignorieren */ }
+    return JSON.parse(JSON.stringify(defaults));
+  }
+  function saveSettings() { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
+
+  function loadLog(key) {
+    try { return JSON.parse(localStorage.getItem(LS_LOG(key))) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveLog(key, log) { localStorage.setItem(LS_LOG(key), JSON.stringify(log)); }
+
+  function loadStreak() {
+    try { return JSON.parse(localStorage.getItem(LS_STREAK)) || { count: 0, lastDate: null }; }
+    catch (e) { return { count: 0, lastDate: null }; }
+  }
+  function saveStreak(s) { localStorage.setItem(LS_STREAK, JSON.stringify(s)); }
+
+  function dateKey(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  /* ──────── Astronomische Berechnung ──────── */
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const fixAngle = (a) => ((a % 360) + 360) % 360;
+
+  function julianDate(y, m, d) {
+    if (m <= 2) { y -= 1; m += 12; }
+    const A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  }
+
+  function sunPosition(jd) {
+    const D = jd - 2451545.0;
+    const g = fixAngle(357.529 + 0.98560028 * D);
+    const q = fixAngle(280.459 + 0.98564736 * D);
+    const L = fixAngle(q + 1.915 * Math.sin(g * D2R) + 0.020 * Math.sin(2 * g * D2R));
+    const e = 23.439 - 0.00000036 * D;
+    const decl = Math.asin(Math.sin(e * D2R) * Math.sin(L * D2R)) * R2D;
+    let RA = Math.atan2(Math.cos(e * D2R) * Math.sin(L * D2R), Math.cos(L * D2R)) * R2D / 15;
+    RA = ((RA % 24) + 24) % 24;
+    let eqt = q / 15 - RA;
+    if (eqt > 12) eqt -= 24;
+    if (eqt < -12) eqt += 24;
+    return { decl: decl, eqt: eqt };
+  }
+
+  // Stundenwinkel für Sonnenstand 'angle' Grad UNTER dem Horizont
+  function hourAngle(angle, lat, decl) {
+    const cosH = (-Math.sin(angle * D2R) - Math.sin(decl * D2R) * Math.sin(lat * D2R)) /
+                 (Math.cos(decl * D2R) * Math.cos(lat * D2R));
+    if (cosH < -1 || cosH > 1) return NaN;
+    return Math.acos(cosH) * R2D / 15;
+  }
+
+  // Asr: Schattenlänge = Faktor × Objekthöhe (+ Mittagsschatten)
+  function asrHourAngle(factor, lat, decl) {
+    const alt = Math.atan(1 / (factor + Math.tan(Math.abs(lat - decl) * D2R))) * R2D;
+    let cosH = (Math.sin(alt * D2R) - Math.sin(decl * D2R) * Math.sin(lat * D2R)) /
+               (Math.cos(decl * D2R) * Math.cos(lat * D2R));
+    cosH = Math.min(1, Math.max(-1, cosH));
+    return Math.acos(cosH) * R2D / 15;
+  }
+
+  function computeTimes(dateObj) {
+    const y = dateObj.getFullYear(), m = dateObj.getMonth() + 1, d = dateObj.getDate();
+    const method = METHODS[settings.method] || METHODS.diyanet;
+    const lat = settings.lat, lng = settings.lng;
+
+    const jd = julianDate(y, m, d) + 0.5 - lng / (15 * 24); // ≈ lokaler Sonnenmittag
+    const sun = sunPosition(jd);
+    const noonUTC = 12 - lng / 15 - sun.eqt; // Dhuhr in UTC-Stunden
+
+    const tSun = hourAngle(0.833, lat, sun.decl); // Sonnenauf-/untergang
+    let t = {
+      dhuhr:   noonUTC,
+      sunrise: noonUTC - tSun,
+      maghrib: noonUTC + tSun,
+      asr:     noonUTC + asrHourAngle(settings.asrFactor, lat, sun.decl),
+      fajr:    noonUTC - hourAngle(method.fajr, lat, sun.decl),
+      isha:    method.ishaInterval ? (noonUTC + tSun + method.ishaInterval / 60)
+                                   : noonUTC + hourAngle(method.isha, lat, sun.decl)
+    };
+
+    // Hochsommer-Fallback (Dämmerung endet nicht): 1/7-Nacht-Regel
+    const nightLen = 24 - 2 * tSun; // Stunden zwischen Untergang & Aufgang
+    if (isNaN(t.fajr)) t.fajr = t.sunrise - nightLen / 7 * 2;
+    if (isNaN(t.isha)) t.isha = t.maghrib + nightLen / 7 * 2;
+
+    const baseUTC = Date.UTC(y, m - 1, d);
+    const out = {};
+    for (const k in t) {
+      const offMin = settings.off[k] || 0;
+      out[k] = new Date(baseUTC + t[k] * 3600000 + offMin * 60000);
+    }
+    return out;
+  }
+
+  /* ──────── Status-Logik ──────── */
+  // Zeitfenster: Fajr–Sonnenaufgang, Dhuhr–Asr, Asr–Maghrib,
+  // Maghrib–Isha, Isha–Fajr (morgen)
+  function windowEnd(key) {
+    switch (key) {
+      case "fajr":    return times.sunrise;
+      case "dhuhr":   return times.asr;
+      case "asr":     return times.maghrib;
+      case "maghrib": return times.isha;
+      case "isha":    return timesTomorrow.fajr;
+    }
+    return null;
+  }
+
+  function statusOf(key, now, log) {
+    const entry = log[key];
+    if (entry && entry.checked) return entry.qada ? "qada" : "done";
+    const start = times[key], end = windowEnd(key);
+    if (now < start) return "upcoming";
+    if (now >= start && now < end) return "active";
+    return "missed";
+  }
+
+  /* ──────── Rendering ──────── */
+  const $ = (id) => document.getElementById(id);
+  const fmt = new Intl.DateTimeFormat("de-AT", { hour: "2-digit", minute: "2-digit" });
+
+  function renderDates() {
+    const now = new Date();
+    const greg = new Intl.DateTimeFormat("de-AT", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(now);
+    let hijri = "";
+    try {
+      hijri = " · " + new Intl.DateTimeFormat("de-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now);
+    } catch (e) { /* Browser ohne Hijri-Support */ }
+    $("prDates").textContent = greg + hijri;
+  }
+
+  function renderStreak() {
+    const s = loadStreak();
+    const el = $("prStreak");
+    if (s.count > 0) {
+      el.textContent = "🔥 " + s.count + " " + (s.count === 1 ? "Tag" : "Tage") + " alle Gebete";
+      el.classList.add("show");
+    } else {
+      el.classList.remove("show");
+    }
+  }
+
+  function renderList() {
+    const now = new Date();
+    const log = loadLog(todayKey);
+    const ul = $("prList");
+    ul.innerHTML = "";
+
+    PRAYERS.forEach(function (p) {
+      const li = document.createElement("li");
+      const time = times[p.key];
+
+      if (p.marker) {
+        li.className = "pr-row marker";
+        li.innerHTML =
+          '<span class="pr-marker-icon">☀</span>' +
+          '<div class="pr-names"><span class="pr-name">' + p.name + " · " + p.sub + "</span></div>" +
+          '<span class="pr-time">' + fmt.format(time) + "</span>";
+        ul.appendChild(li);
+        return;
+      }
+
+      const st = statusOf(p.key, now, log);
+      li.className = "pr-row " + st;
+
+      const tag = st === "missed" ? "verpasst" : (st === "qada" ? "nachgeholt" : "");
+      li.innerHTML =
+        '<div class="pr-check' + (st === "upcoming" ? " disabled" : "") + '" data-key="' + p.key + '" role="checkbox" aria-checked="' + (st === "done" || st === "qada") + '" tabindex="0">✓</div>' +
+        '<div class="pr-names">' +
+          '<span class="pr-name">' + p.name + "</span>" +
+          '<span class="pr-sub">' + p.sub + (tag ? ' · <span class="pr-state-tag">' + tag + "</span>" : "") + "</span>" +
+        "</div>" +
+        '<span class="pr-ar">' + p.ar + "</span>" +
+        '<span class="pr-time">' + fmt.format(time) + "</span>";
+      ul.appendChild(li);
+    });
+
+    // Fortschritt + Badge
+    let done = 0, segsHtml = "";
+    CHECKABLE.forEach(function (k) {
+      const e = log[k];
+      const cls = e && e.checked ? (e.qada ? "pr-seg q" : "pr-seg on") : "pr-seg";
+      if (e && e.checked) done++;
+      segsHtml += '<div class="' + cls + '"></div>';
+    });
+    $("prProgress").innerHTML = segsHtml;
+    $("prFootText").textContent = done + " / 5 Gebete heute verrichtet";
+
+    const missed = CHECKABLE.filter(function (k) { return statusOf(k, now, log) === "missed"; }).length;
+    const activeOpen = CHECKABLE.some(function (k) { return statusOf(k, now, log) === "active"; });
+    const badge = $("prBadge");
+    if (missed > 0) {
+      badge.textContent = missed;
+      badge.className = "pr-badge show";
+    } else if (activeOpen) {
+      badge.textContent = "!";
+      badge.className = "pr-badge show due";
+    } else {
+      badge.className = "pr-badge";
+    }
+  }
+
+  function renderNext() {
+    const now = new Date();
+    let prevT = null, nextKey = null, nextT = null;
+
+    const order = ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"];
+    for (let i = 0; i < order.length; i++) {
+      if (now < times[order[i]]) { nextKey = order[i]; nextT = times[order[i]]; prevT = i === 0 ? null : times[order[i - 1]]; break; }
+    }
+    if (!nextKey) { nextKey = "fajr"; nextT = timesTomorrow.fajr; prevT = times.isha; }
+    if (!prevT) prevT = new Date(nextT.getTime() - 6 * 3600000);
+
+    const p = PRAYERS.find(function (x) { return x.key === nextKey; });
+    $("prNextName").textContent = p.name;
+    $("prNextTime").textContent = "um " + fmt.format(nextT) + " Uhr";
+
+    const total = nextT - prevT;
+    const left = nextT - now;
+    const frac = Math.min(1, Math.max(0, 1 - left / total));
+    const C = 2 * Math.PI * 34;
+    const fg = $("prRingFg");
+    fg.setAttribute("stroke-dasharray", C.toFixed(1));
+    fg.setAttribute("stroke-dashoffset", (C * (1 - frac)).toFixed(1));
+
+    const h = Math.floor(left / 3600000), min = Math.ceil((left % 3600000) / 60000);
+    $("prRingText").textContent = h > 0 ? h + "h " + min + "m" : min + "m";
+  }
+
+  function renderAll() {
+    renderDates();
+    renderStreak();
+    renderList();
+    renderNext();
+  }
+
+  /* ──────── Abhaken & Streak ──────── */
+  function toggle(key) {
+    const now = new Date();
+    const log = loadLog(todayKey);
+    const st = statusOf(key, now, log);
+
+    if (st === "upcoming") return; // vor der Zeit nicht abhakbar
+
+    if (log[key] && log[key].checked) {
+      delete log[key];
+    } else {
+      log[key] = { checked: true, at: now.getTime(), qada: st === "missed" };
+    }
+    saveLog(todayKey, log);
+
+    // Streak: alle 5 abgehakt?
+    const all = CHECKABLE.every(function (k) { return log[k] && log[k].checked; });
+    const s = loadStreak();
+    if (all && s.lastDate !== todayKey) {
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      s.count = (s.lastDate === dateKey(y)) ? s.count + 1 : 1;
+      s.lastDate = todayKey;
+      saveStreak(s);
+    }
+    renderAll();
+  }
+
+  /* ──────── Tages-Rollover & Ticker ──────── */
+  function recompute() {
+    todayKey = dateKey(new Date());
+    const today = new Date();
+    times = computeTimes(today);
+    const tm = new Date(today); tm.setDate(tm.getDate() + 1);
+    timesTomorrow = computeTimes(tm);
+    // Logs älter als 60 Tage aufräumen
+    try {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("skyos.prayer.log.") === 0 && k.slice(17) < dateKey(cutoff)) localStorage.removeItem(k);
+      }
+    } catch (e) { /* egal */ }
+    renderAll();
+  }
+
+  setInterval(function () {
+    if (dateKey(new Date()) !== todayKey) { recompute(); return; } // Mitternacht → neue Zeiten
+    renderList();
+    renderNext();
+  }, 15000);
+
+  /* ──────── UI-Events ──────── */
+  $("prTab").addEventListener("click", function () { $("prPanel").classList.add("open"); });
+  $("prClose").addEventListener("click", function () { $("prPanel").classList.remove("open"); });
+  $("prGear").addEventListener("click", function () { $("prSettings").classList.toggle("open"); });
+
+  $("prList").addEventListener("click", function (ev) {
+    const c = ev.target.closest(".pr-check");
+    if (c && !c.classList.contains("disabled")) toggle(c.dataset.key);
+  });
+  $("prList").addEventListener("keydown", function (ev) {
+    if ((ev.key === "Enter" || ev.key === " ") && ev.target.classList.contains("pr-check")) {
+      ev.preventDefault();
+      if (!ev.target.classList.contains("disabled")) toggle(ev.target.dataset.key);
+    }
+  });
+
+  // Einstellungen befüllen & speichern
+  function fillSettingsForm() {
+    $("prLat").value = settings.lat;
+    $("prLng").value = settings.lng;
+    $("prMethod").value = settings.method;
+    $("prAsr").value = String(settings.asrFactor);
+    $("offFajr").value = settings.off.fajr;
+    $("offDhuhr").value = settings.off.dhuhr;
+    $("offAsr").value = settings.off.asr;
+    $("offMaghrib").value = settings.off.maghrib;
+    $("offIsha").value = settings.off.isha;
+    $("offSunrise").value = settings.off.sunrise;
+  }
+  $("prSave").addEventListener("click", function () {
+    settings.lat = parseFloat($("prLat").value) || defaults.lat;
+    settings.lng = parseFloat($("prLng").value) || defaults.lng;
+    settings.method = $("prMethod").value;
+    settings.asrFactor = parseInt($("prAsr").value, 10) || 2;
+    settings.off = {
+      fajr: parseInt($("offFajr").value, 10) || 0,
+      dhuhr: parseInt($("offDhuhr").value, 10) || 0,
+      asr: parseInt($("offAsr").value, 10) || 0,
+      maghrib: parseInt($("offMaghrib").value, 10) || 0,
+      isha: parseInt($("offIsha").value, 10) || 0,
+      sunrise: parseInt($("offSunrise").value, 10) || 0
+    };
+    saveSettings();
+    $("prSettings").classList.remove("open");
+    recompute();
+  });
+  $("prLocate").addEventListener("click", function () {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      $("prLat").value = pos.coords.latitude.toFixed(4);
+      $("prLng").value = pos.coords.longitude.toFixed(4);
+    });
+  });
+
+  /* ──────── Start ──────── */
+  fillSettingsForm();
+  recompute();
+})();
+</script>
+<!-- SKYOS:PRAYER:MARKUP:END -->
+
 </body>
 </html>
