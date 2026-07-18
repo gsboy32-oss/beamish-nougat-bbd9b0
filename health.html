@@ -492,6 +492,139 @@ main {
   .tab { padding: 10px 6px; font-size: 11px; gap: 4px; }
   .tab-icon { width: 16px; height: 16px; }
 }
+
+/* ============================================================
+   SkyOS Health — Manual Log segment. Scoped under .mh-root so its
+   generic input[type] rules and CSS variables (--mh-*) can never
+   leak onto the Daily Stack tracker above/below it.
+   ============================================================ */
+:root{
+  --mh-bg-0:#080b11;
+  --mh-bg-1:#0c1119;
+  --mh-glass:rgba(255,255,255,0.045);
+  --mh-glass-strong:rgba(255,255,255,0.07);
+  --mh-stroke:rgba(255,255,255,0.09);
+  --mh-stroke-strong:rgba(255,255,255,0.16);
+  --mh-text:#e8edf4;
+  --mh-text-dim:#9aa6b6;
+  --mh-text-faint:#5f6b7a;
+  --mh-accent:#5eead4;
+  --mh-accent-dim:rgba(94,234,212,0.14);
+  --mh-deep:#3b82f6;
+  --mh-rem:#8b7cf6;
+  --mh-light:#7dd3fc;
+  --mh-warn:#fbbf24;
+  --mh-warn-dim:rgba(251,191,36,0.14);
+  --mh-good:#4ade80;
+  --mh-radius:18px;
+  --mh-radius-sm:12px;
+  --mh-font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+
+.mh-root{ font-family:var(--mh-font); color:var(--mh-text); margin-bottom:28px; }
+
+.mh-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.mh-top .mh-title-row{font-size:21px;font-weight:600;letter-spacing:-0.02em;display:flex;align-items:center;gap:9px}
+.mh-top .mh-dot{width:8px;height:8px;border-radius:50%;background:var(--mh-accent);box-shadow:0 0 12px var(--mh-accent)}
+.mh-top .mh-sub{font-size:13px;color:var(--mh-text-faint);margin-top:3px}
+.mh-top .mh-right{display:flex;align-items:center;gap:10px}
+.mh-chip{font-size:12px;padding:5px 12px;border-radius:999px;background:var(--mh-accent-dim);color:var(--mh-accent);border:1px solid rgba(94,234,212,0.25)}
+.mh-icon-btn{background:var(--mh-glass);border:1px solid var(--mh-stroke);color:var(--mh-text-dim);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.15s}
+.mh-icon-btn:hover{background:var(--mh-glass-strong);color:var(--mh-text)}
+
+.mh-card{
+  background:var(--mh-glass);
+  border:1px solid var(--mh-stroke);
+  border-radius:var(--mh-radius);
+  backdrop-filter:blur(20px) saturate(140%);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  padding:18px 20px;
+  margin-bottom:14px;
+}
+.mh-card .mh-head{display:flex;align-items:center;gap:9px;margin-bottom:15px}
+.mh-card .mh-head .mh-t{font-size:15px;font-weight:600}
+.mh-card .mh-head .mh-ic{color:var(--mh-accent);font-size:17px;line-height:1}
+.mh-card .mh-head .mh-note{margin-left:auto;font-size:11px;color:var(--mh-text-faint)}
+
+.mh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.mh-tile{background:var(--mh-glass);border:1px solid var(--mh-stroke);border-radius:var(--mh-radius-sm);padding:15px 16px}
+.mh-tile .mh-lbl{font-size:12px;color:var(--mh-text-faint);text-transform:uppercase;letter-spacing:0.05em}
+.mh-tile .mh-val{font-size:27px;font-weight:600;letter-spacing:-0.02em;margin-top:5px}
+.mh-tile .mh-val small{font-size:14px;color:var(--mh-text-dim);font-weight:500}
+.mh-tile .mh-meta{font-size:12px;color:var(--mh-text-dim);margin-top:4px;display:flex;align-items:center;gap:5px}
+.mh-meta.up{color:var(--mh-good)} .mh-meta.down{color:var(--mh-good)} .mh-meta.warn{color:var(--mh-warn)}
+
+.mh-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:14px}
+
+.mh-root label.mh-f{font-size:12px;color:var(--mh-text-faint);display:block;margin-bottom:5px}
+.mh-root input[type=text],.mh-root input[type=number]{
+  width:100%;height:38px;border-radius:10px;border:1px solid var(--mh-stroke);
+  background:rgba(0,0,0,0.22);color:var(--mh-text);padding:0 12px;font-size:15px;font-family:var(--mh-font);
+  transition:.15s;
+}
+.mh-root input[type=text]:focus,.mh-root input[type=number]:focus{outline:none;border-color:var(--mh-accent);box-shadow:0 0 0 3px var(--mh-accent-dim)}
+.mh-root input::-webkit-outer-spin-button,.mh-root input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.mh-root input[type=number]{-moz-appearance:textfield}
+
+.mh-root input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:5px;background:rgba(255,255,255,0.12);outline:none}
+.mh-root input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--mh-accent);cursor:pointer;box-shadow:0 0 10px var(--mh-accent-dim);border:2px solid #0c1119}
+.mh-root input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--mh-accent);cursor:pointer;border:2px solid #0c1119}
+
+.mh-sleep-bar{display:flex;height:16px;border-radius:6px;overflow:hidden;margin:2px 0 10px;background:rgba(255,255,255,0.05)}
+.mh-sleep-bar > div{transition:flex .3s}
+.mh-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--mh-text-dim);margin-bottom:16px}
+.mh-legend b{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:0}
+.mh-phase-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.mh-slider-row{display:flex;align-items:center;gap:12px}
+.mh-slider-row .mh-out{font-size:16px;font-weight:600;min-width:44px;text-align:right;color:var(--mh-accent)}
+
+.mh-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-bottom:14px}
+.mh-kcal{
+  background:var(--mh-accent-dim);border:1px solid rgba(94,234,212,0.28);border-radius:var(--mh-radius-sm);
+  padding:13px 16px;display:flex;align-items:center;justify-content:space-between;
+}
+.mh-kcal .mh-l{font-size:12px;color:var(--mh-accent);display:flex;align-items:center;gap:6px}
+.mh-kcal .mh-v{font-size:23px;font-weight:700;color:var(--mh-accent);letter-spacing:-0.02em}
+.mh-kcal-note{font-size:11px;color:var(--mh-text-faint);margin-top:7px}
+
+.mh-sym{border:1px solid var(--mh-warn-dim);border-radius:var(--mh-radius-sm);padding:12px 14px;margin-bottom:10px;background:rgba(251,191,36,0.04)}
+.mh-sym .mh-row1{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex-wrap:wrap}
+.mh-sym .mh-name{font-size:15px;font-weight:600}
+.mh-sym .mh-badge{font-size:11px;background:var(--mh-warn-dim);color:var(--mh-warn);padding:2px 9px;border-radius:999px;border:1px solid rgba(251,191,36,0.3)}
+.mh-sym .mh-done{margin-left:auto;font-size:12px;color:var(--mh-text-dim);background:none;border:1px solid var(--mh-stroke);padding:5px 11px;border-radius:9px;cursor:pointer;transition:.15s}
+.mh-sym .mh-done:hover{border-color:var(--mh-good);color:var(--mh-good)}
+.mh-tips{display:flex;flex-wrap:wrap;gap:7px}
+.mh-tip{font-size:12px;background:var(--mh-glass-strong);border:1px solid var(--mh-stroke);padding:5px 11px;border-radius:999px;color:var(--mh-text-dim)}
+.mh-sym-note{font-size:11px;color:var(--mh-text-faint);margin-top:9px;display:flex;align-items:center;gap:5px}
+.mh-add-sym{background:var(--mh-glass);border:1px solid var(--mh-stroke);color:var(--mh-text-dim);font-size:13px;padding:7px 13px;border-radius:10px;cursor:pointer;margin-left:auto;transition:.15s;font-family:var(--mh-font)}
+.mh-add-sym:hover{background:var(--mh-glass-strong);color:var(--mh-text)}
+.mh-empty{font-size:13px;color:var(--mh-text-faint);padding:6px 0}
+
+.mh-hint{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--mh-text-dim);margin-top:4px;line-height:1.5}
+.mh-hint .mh-ic{color:var(--mh-accent);font-size:16px;margin-top:1px}
+.mh-hint.rest{color:var(--mh-warn)} .mh-hint.rest .mh-ic{color:var(--mh-warn)}
+
+.mh-savebar{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
+.mh-btn{font-family:var(--mh-font);font-size:14px;font-weight:600;padding:11px 20px;border-radius:11px;cursor:pointer;transition:.15s;border:1px solid var(--mh-stroke)}
+.mh-btn.mh-primary{background:var(--mh-accent);color:#04241f;border-color:transparent}
+.mh-btn.mh-primary:hover{filter:brightness(1.08)}
+.mh-btn.mh-ghost{background:var(--mh-glass);color:var(--mh-text-dim)}
+.mh-btn.mh-ghost:hover{background:var(--mh-glass-strong);color:var(--mh-text)}
+.mh-saved-flash{font-size:13px;color:var(--mh-good);align-self:center;opacity:0;transition:.3s}
+.mh-saved-flash.show{opacity:1}
+
+.mh-settings{display:none;margin-bottom:14px}
+.mh-settings.open{display:block}
+.mh-settings .mh-form-grid{margin-bottom:0}
+.mh-seg{display:flex;gap:6px}
+.mh-seg button{flex:1;height:38px;border-radius:10px;border:1px solid var(--mh-stroke);background:rgba(0,0,0,0.22);color:var(--mh-text-dim);cursor:pointer;font-family:var(--mh-font);font-size:14px;transition:.15s}
+.mh-seg button.active{background:var(--mh-accent-dim);color:var(--mh-accent);border-color:rgba(94,234,212,0.3)}
+
+.mh-spacer{height:14px}
+
+@media (max-width: 600px) {
+  .mh-card { padding: 16px 14px; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="topbar.js" defer></script>
@@ -499,6 +632,138 @@ main {
 <body>
 
 <main>
+  <div class="section-title">Daily Health</div>
+  <section class="mh-root" id="mhRoot">
+
+    <div class="mh-top">
+      <div>
+        <div class="mh-title-row"><span class="mh-dot"></span> Health — Manual Log</div>
+        <div class="mh-sub" id="mhDateSub">—</div>
+      </div>
+      <div class="mh-right">
+        <span class="mh-chip" id="mhStatusChip">Not logged yet</span>
+        <button class="mh-icon-btn" id="mhGearBtn" title="Profile">⚙</button>
+      </div>
+    </div>
+
+    <!-- Settings (profile for calorie formula) -->
+    <div class="mh-card mh-settings" id="mhSettings">
+      <div class="mh-head"><span class="mh-ic">⚙</span><span class="mh-t">Profile (for calorie calculation)</span></div>
+      <div class="mh-form-grid">
+        <div><label class="mh-f">Weight (kg)</label><input type="number" id="mhPWeight" step="0.1" /></div>
+        <div><label class="mh-f">Age</label><input type="number" id="mhPAge" /></div>
+      </div>
+      <div class="mh-spacer"></div>
+      <label class="mh-f">Sex (Keytel formula)</label>
+      <div class="mh-seg" id="mhSexSeg">
+        <button data-sex="m" class="active">Male</button>
+        <button data-sex="f">Female</button>
+      </div>
+    </div>
+
+    <!-- Quick tiles -->
+    <div class="mh-tiles">
+      <div class="mh-tile">
+        <div class="mh-lbl">Sleep</div>
+        <div class="mh-val" id="mhTSleep">—</div>
+        <div class="mh-meta" id="mhTSleepMeta">Subjective —</div>
+      </div>
+      <div class="mh-tile">
+        <div class="mh-lbl">Resting HR</div>
+        <div class="mh-val" id="mhTRhr">—</div>
+        <div class="mh-meta" id="mhTRhrMeta">Baseline —</div>
+      </div>
+      <div class="mh-tile">
+        <div class="mh-lbl">Weight</div>
+        <div class="mh-val" id="mhTWeight">—</div>
+        <div class="mh-meta" id="mhTWeightMeta">7d avg —</div>
+      </div>
+      <div class="mh-tile">
+        <div class="mh-lbl">Energy</div>
+        <div class="mh-val" id="mhTEnergy">—</div>
+        <div class="mh-meta" id="mhTEnergyMeta">Mood —</div>
+      </div>
+    </div>
+
+    <!-- Sleep + Training -->
+    <div class="mh-grid2">
+
+      <div class="mh-card">
+        <div class="mh-head"><span class="mh-ic">☾</span><span class="mh-t">Sleep</span><span class="mh-note">Phases read from your watch</span></div>
+        <div class="mh-sleep-bar">
+          <div id="mhBarDeep"  style="flex:2.2;background:var(--mh-deep)"></div>
+          <div id="mhBarRem"   style="flex:1.6;background:var(--mh-rem)"></div>
+          <div id="mhBarLight" style="flex:3.4;background:var(--mh-light)"></div>
+        </div>
+        <div class="mh-legend">
+          <span><b style="background:var(--mh-deep)"></b>Deep</span>
+          <span><b style="background:var(--mh-rem)"></b>REM</span>
+          <span><b style="background:var(--mh-light)"></b>Light</span>
+        </div>
+        <div class="mh-phase-inputs">
+          <div><label class="mh-f">Deep (min)</label><input type="number" id="mhSDeep" placeholder="0" /></div>
+          <div><label class="mh-f">REM (min)</label><input type="number" id="mhSRem" placeholder="0" /></div>
+          <div><label class="mh-f">Light (min)</label><input type="number" id="mhSLight" placeholder="0" /></div>
+        </div>
+        <label class="mh-f">Subjective rating</label>
+        <div class="mh-slider-row">
+          <input type="range" id="mhSQual" min="1" max="10" value="7" step="1" />
+          <span class="mh-out" id="mhSQualOut">7/10</span>
+        </div>
+      </div>
+
+      <div class="mh-card">
+        <div class="mh-head"><span class="mh-ic">❤</span><span class="mh-t">Training</span></div>
+        <div class="mh-form-grid">
+          <div><label class="mh-f">Sport</label><input type="text" id="mhWSport" placeholder="Running" /></div>
+          <div><label class="mh-f">Duration (min)</label><input type="number" id="mhWDur" placeholder="0" /></div>
+          <div><label class="mh-f">Avg heart rate</label><input type="number" id="mhWHr" placeholder="optional" /></div>
+          <div><label class="mh-f">Distance (km)</label><input type="number" id="mhWDist" step="0.1" placeholder="optional" /></div>
+        </div>
+        <div class="mh-kcal">
+          <span class="mh-l">🔥 Calories <span id="mhKcalMethod" style="opacity:.7">(—)</span></span>
+          <span class="mh-v" id="mhKcalVal">0 kcal</span>
+        </div>
+        <div class="mh-kcal-note" id="mhKcalNote">Enter heart rate → HR formula (Keytel). Without heart rate: estimate via distance/duration (MET).</div>
+      </div>
+    </div>
+
+    <!-- Vitals -->
+    <div class="mh-card">
+      <div class="mh-head"><span class="mh-ic">♥</span><span class="mh-t">Vitals &amp; State</span></div>
+      <div class="mh-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+        <div><label class="mh-f">Resting HR</label><input type="number" id="mhVRhr" placeholder="bpm" /></div>
+        <div><label class="mh-f">Weight (kg)</label><input type="number" id="mhVWeight" step="0.1" /></div>
+        <div>
+          <label class="mh-f">Energy: <span id="mhVEnergyOut" style="color:var(--mh-accent)">7</span>/10</label>
+          <input type="range" id="mhVEnergy" min="1" max="10" value="7" step="1" style="margin-top:8px" />
+        </div>
+        <div><label class="mh-f">Mood</label><input type="text" id="mhVMood" placeholder="e.g. good" /></div>
+      </div>
+    </div>
+
+    <!-- Symptoms -->
+    <div class="mh-card">
+      <div class="mh-head">
+        <span class="mh-ic">✚</span><span class="mh-t">Health Status &amp; Symptoms</span>
+        <button class="mh-add-sym" id="mhAddSymBtn">+ Symptom</button>
+      </div>
+      <div id="mhSymList"></div>
+      <div class="mh-hint" id="mhReadiness" style="margin-top:12px">
+        <span class="mh-ic">◆</span>
+        <span id="mhReadinessText">Log sleep and state — with poor sleep and an active symptom, a lighter day gets suggested automatically.</span>
+      </div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="mh-savebar">
+      <span class="mh-saved-flash" id="mhSavedFlash">✓ Saved</span>
+      <button class="mh-btn mh-ghost" id="mhResetBtn">Reset day</button>
+      <button class="mh-btn mh-primary" id="mhSaveBtn">Save day</button>
+    </div>
+
+  </section>
+
   <div class="section-title">Daily Stack</div>
 
   <div class="stack-card">
@@ -1165,6 +1430,377 @@ main {
   healthPullAndApply(true);
   healthStartPolling();
   healthStartRealtime();
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     SkyOS Health — Manual Log logic
+     Storage keys:
+       skyos_health_profile   -> {weight, age, sex}
+       skyos_health_days      -> { "YYYY-MM-DD": {...entry} }
+       skyos_health_symptoms  -> [ {id,name,tips,since} ]
+     ============================================================ */
+
+  const $ = id => document.getElementById(id);
+  const todayKey = () => new Date().toISOString().slice(0, 10);
+
+  /* ---- Symptom templates (home remedies, NOT dosage/diagnosis) ---- */
+  const SYMPTOM_TEMPLATES = {
+    "sore throat":  ["Gargle salt water", "Drink warm tea", "Sleep early"],
+    "stomach ache": ["Hot water bottle", "Light meals", "Chamomile tea", "Plenty of water"],
+    "headache":     ["Plenty of water", "Screen break", "Fresh air", "Rest"],
+    "cold":         ["Plenty of rest", "Stay warm", "Ginger tea", "Steam inhalation"],
+    "cough":        ["Warm drinks", "Humidify the air", "Honey tea"],
+    "runny nose":   ["Steam inhalation", "Nasal rinse", "Stay warm"],
+    "fever":        ["Drink plenty", "Rest", "Calf wraps", "Dress lightly"],
+    "sore muscles": ["Light movement", "Stretching", "Warmth", "Enough protein"]
+  };
+  const defaultTips = ["Enough rest", "Drink plenty of water", "Listen to your body"];
+
+  /* ---- Profile ---- */
+  let profile = load("skyos_health_profile", { weight: 74, age: 20, sex: "m" });
+  function applyProfileToUI() {
+    $("mhPWeight").value = profile.weight;
+    $("mhPAge").value = profile.age;
+    document.querySelectorAll("#mhSexSeg button").forEach(b => b.classList.toggle("active", b.dataset.sex === profile.sex));
+  }
+
+  /* ============================================================
+     CALORIES — Keytel et al. (2005), heart-rate based
+     Men:   kcal/min = (-55.0969 + 0.6309*HR + 0.1988*kg + 0.2017*age)/4.184
+     Women: kcal/min = (-20.4022 + 0.4472*HR - 0.1263*kg + 0.074*age)/4.184
+     Fallback without heart rate: MET estimate (running ~ speed).
+     ============================================================ */
+  function calcCalories() {
+    const dur  = num($("mhWDur").value);
+    const hr   = num($("mhWHr").value);
+    const dist = num($("mhWDist").value);
+    const kg   = profile.weight, age = profile.age;
+    if (dur <= 0) { setKcal(0, "—"); return 0; }
+
+    // 1) Heart-rate formula preferred
+    if (hr > 0) {
+      let perMin = profile.sex === "f"
+        ? (-20.4022 + 0.4472 * hr - 0.1263 * kg + 0.074 * age) / 4.184
+        : (-55.0969 + 0.6309 * hr + 0.1988 * kg + 0.2017 * age) / 4.184;
+      perMin = Math.max(0, perMin);
+      setKcal(Math.round(perMin * dur), "HR");
+      return Math.round(perMin * dur);
+    }
+
+    // 2) MET fallback via speed (only if distance given)
+    if (dist > 0) {
+      const speed = dist / (dur / 60);            // km/h
+      const met = Math.max(3, Math.min(18, speed * 1.03)); // rough running estimate
+      const kcal = met * kg * (dur / 60);
+      setKcal(Math.round(kcal), "MET");
+      return Math.round(kcal);
+    }
+
+    // 3) last-resort fallback: moderate activity
+    const kcal = 6 * kg * (dur / 60);
+    setKcal(Math.round(kcal), "MET");
+    return Math.round(kcal);
+  }
+  function setKcal(v, method) {
+    $("mhKcalVal").textContent = v + " kcal";
+    $("mhKcalMethod").textContent = method === "—" ? "(—)" : "(" + method + " formula)";
+    $("mhKcalNote").textContent = method === "HR"
+      ? "Calculated from avg heart rate · weight · age (more accurate)."
+      : method === "MET"
+        ? "Estimated without heart rate (MET). Enter heart rate for more accurate values."
+        : "Enter heart rate → HR formula. Without heart rate: estimate via distance/duration.";
+  }
+
+  /* ============================================================
+     BASELINE — rolling 7-day average from history
+     ============================================================ */
+  function baseline(field, days) {
+    const vals = Object.values(days)
+      .map(d => d[field]).filter(v => typeof v === "number" && v > 0)
+      .slice(-7);
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+
+  /* ============================================================
+     SYMPTOMS
+     ============================================================ */
+  let symptoms = load("skyos_health_symptoms", []);
+
+  function renderSymptoms() {
+    const list = $("mhSymList");
+    list.innerHTML = "";
+    if (!symptoms.length) {
+      list.innerHTML = '<div class="mh-empty">No active symptoms — all good.</div>';
+      updateReadiness(); return;
+    }
+    symptoms.forEach(s => {
+      const dayNr = Math.max(1, Math.floor((Date.now() - s.since) / 86400000) + 1);
+      const el = document.createElement("div");
+      el.className = "mh-sym";
+      el.innerHTML = `
+        <div class="mh-row1">
+          <span class="mh-name">${esc(s.name)}</span>
+          <span class="mh-badge">Day ${dayNr} · active</span>
+          <button class="mh-done" data-id="${s.id}">✓ done</button>
+        </div>
+        <div class="mh-tips">${s.tips.map(t => `<span class="mh-tip">${esc(t)}</span>`).join("")}</div>
+        <div class="mh-sym-note">📅 Daily reminder runs until checked off · no diagnoses/dosages</div>`;
+      list.appendChild(el);
+    });
+    list.querySelectorAll(".mh-done").forEach(b => b.onclick = () => {
+      symptoms = symptoms.filter(s => s.id != b.dataset.id);
+      save("skyos_health_symptoms", symptoms); renderSymptoms();
+    });
+    updateReadiness();
+  }
+
+  function addSymptom() {
+    const name = (prompt("Which symptom? (e.g. sore throat, stomach ache)") || "").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    const tips = SYMPTOM_TEMPLATES[key] || defaultTips;
+    symptoms.push({ id: Date.now(), name, tips, since: Date.now() });
+    save("skyos_health_symptoms", symptoms); renderSymptoms();
+  }
+
+  /* ============================================================
+     READINESS — suggest a lighter day on poor sleep + symptom
+     ============================================================ */
+  function updateReadiness() {
+    const qual = +$("mhSQual").value;
+    const hasSymptom = symptoms.length > 0;
+    const box = $("mhReadiness"), txt = $("mhReadinessText");
+    if (hasSymptom && qual <= 5) {
+      box.className = "mh-hint rest";
+      txt.textContent = "Poor sleep + an active symptom — a lighter day is recommended today: recovery instead of a hard run, focus on studying and sleeping early.";
+    } else if (hasSymptom) {
+      box.className = "mh-hint";
+      txt.textContent = "Active symptom present — ease off intensity today and keep an eye on it.";
+    } else if (qual <= 4) {
+      box.className = "mh-hint rest";
+      txt.textContent = "Sleep was weak — go for lighter training today and focus on recovery.";
+    } else {
+      box.className = "mh-hint";
+      txt.textContent = "Doing well — normal training is fine.";
+    }
+  }
+
+  /* ============================================================
+     TILES / display refresh
+     ============================================================ */
+  function refreshTiles() {
+    const days = load("skyos_health_days", {});
+
+    // Sleep
+    const tot = num($("mhSDeep").value) + num($("mhSRem").value) + num($("mhSLight").value);
+    $("mhTSleep").innerHTML = tot > 0 ? fmtDur(tot) : "—";
+    $("mhTSleepMeta").textContent = "Subjective " + $("mhSQual").value + "/10";
+
+    // Resting HR + baseline
+    const rhr = num($("mhVRhr").value);
+    $("mhTRhr").innerHTML = rhr > 0 ? rhr + ' <small>bpm</small>' : "—";
+    const rhrBase = baseline("rhr", days);
+    const rhrMeta = $("mhTRhrMeta");
+    if (rhr > 0 && rhrBase) {
+      const diff = Math.round(rhr - rhrBase);
+      if (diff < 0) { rhrMeta.className = "mh-meta down"; rhrMeta.textContent = "▼ " + Math.abs(diff) + " below baseline"; }
+      else if (diff > 0) { rhrMeta.className = "mh-meta warn"; rhrMeta.textContent = "▲ " + diff + " above baseline"; }
+      else { rhrMeta.className = "mh-meta"; rhrMeta.textContent = "at baseline"; }
+    } else rhrMeta.textContent = rhrBase ? "7d avg " + Math.round(rhrBase) : "Baseline —";
+
+    // Weight
+    const w = num($("mhVWeight").value);
+    $("mhTWeight").innerHTML = w > 0 ? w.toFixed(1) + ' <small>kg</small>' : "—";
+    const wBase = baseline("weight", days);
+    $("mhTWeightMeta").textContent = wBase ? "7d avg " + wBase.toFixed(1) + " kg" : "7d avg —";
+
+    // Energy
+    $("mhTEnergy").innerHTML = $("mhVEnergy").value + '<small>/10</small>';
+    $("mhTEnergyMeta").textContent = "Mood: " + ($("mhVMood").value || "—");
+
+    // Sleep bar
+    $("mhBarDeep").style.flex  = Math.max(0.1, num($("mhSDeep").value));
+    $("mhBarRem").style.flex   = Math.max(0.1, num($("mhSRem").value));
+    $("mhBarLight").style.flex = Math.max(0.1, num($("mhSLight").value));
+  }
+
+  /* ============================================================
+     SAVE / LOAD
+     ============================================================ */
+  function collect() {
+    return {
+      date: todayKey(),
+      sleep: { deep: num($("mhSDeep").value), rem: num($("mhSRem").value), light: num($("mhSLight").value), quality: +$("mhSQual").value },
+      workout: { sport: $("mhWSport").value, dur: num($("mhWDur").value), hr: num($("mhWHr").value), dist: num($("mhWDist").value), kcal: calcCalories() },
+      rhr: num($("mhVRhr").value),
+      weight: num($("mhVWeight").value),
+      energy: +$("mhVEnergy").value,
+      mood: $("mhVMood").value
+    };
+  }
+  function saveDay() {
+    const days = load("skyos_health_days", {});
+    days[todayKey()] = collect();
+    save("skyos_health_days", days);
+    refreshTiles();
+    $("mhStatusChip").textContent = "Logged today";
+    flash();
+  }
+  function loadDay() {
+    const days = load("skyos_health_days", {});
+    const d = days[todayKey()];
+    if (!d) { $("mhStatusChip").textContent = "Not logged yet"; return; }
+    $("mhSDeep").value = d.sleep.deep || ""; $("mhSRem").value = d.sleep.rem || ""; $("mhSLight").value = d.sleep.light || "";
+    $("mhSQual").value = d.sleep.quality; $("mhSQualOut").textContent = d.sleep.quality + "/10";
+    $("mhWSport").value = d.workout.sport || ""; $("mhWDur").value = d.workout.dur || ""; $("mhWHr").value = d.workout.hr || ""; $("mhWDist").value = d.workout.dist || "";
+    $("mhVRhr").value = d.rhr || ""; $("mhVWeight").value = d.weight || "";
+    $("mhVEnergy").value = d.energy; $("mhVEnergyOut").textContent = d.energy; $("mhVMood").value = d.mood || "";
+    $("mhStatusChip").textContent = "Logged today";
+  }
+  function resetDay() {
+    if (!confirm("Reset today's entries?")) return;
+    const days = load("skyos_health_days", {});
+    delete days[todayKey()]; save("skyos_health_days", days);
+    ["mhSDeep", "mhSRem", "mhSLight", "mhWSport", "mhWDur", "mhWHr", "mhWDist", "mhVRhr", "mhVWeight", "mhVMood"].forEach(i => $(i).value = "");
+    $("mhSQual").value = 7; $("mhSQualOut").textContent = "7/10";
+    $("mhVEnergy").value = 7; $("mhVEnergyOut").textContent = "7";
+    $("mhStatusChip").textContent = "Not logged yet";
+    calcCalories(); refreshTiles(); updateReadiness();
+  }
+
+  /* ---- Helpers ---- */
+  function num(v) { const n = parseFloat(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; }
+  function fmtDur(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h + '<small>h</small> ' + String(m).padStart(2, "0") + '<small>m</small>'; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function load(k, f) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch (e) { return f; } }
+  function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); mhSchedulePush(); }
+  function flash() { const f = $("mhSavedFlash"); f.classList.add("show"); setTimeout(() => f.classList.remove("show"), 1600); }
+
+  /* ---------- Supabase sync (app_state table, key 'health-manual') ---------- */
+  const MH_SUPABASE_URL = 'https://eliwawvkkcamntciekhd.supabase.co';
+  const MH_SUPABASE_KEY = 'sb_publishable_HLgA595j21f-RVPwR8zGFg_8LjGJnq0';
+  const MH_APP_KEY = 'health-manual';
+  const MH_KEYS = ['skyos_health_profile', 'skyos_health_days', 'skyos_health_symptoms'];
+
+  function mhCollectState() {
+    const out = {};
+    MH_KEYS.forEach(function (k) {
+      const v = localStorage.getItem(k);
+      if (v == null) return;
+      try { out[k] = JSON.parse(v); } catch (e) {}
+    });
+    return out;
+  }
+  let mhPushTimer = null;
+  function mhPushNow() {
+    fetch(MH_SUPABASE_URL + '/rest/v1/app_state', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': MH_SUPABASE_KEY,
+        'Authorization': 'Bearer ' + MH_SUPABASE_KEY,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({ key: MH_APP_KEY, data: mhCollectState(), updated_at: new Date().toISOString() })
+    }).catch(function () {});
+  }
+  function mhSchedulePush() {
+    clearTimeout(mhPushTimer);
+    mhPushTimer = setTimeout(mhPushNow, 250);
+  }
+  function mhApplyRemote(data, rerender) {
+    if (!data) return;
+    Object.keys(data).forEach(function (k) {
+      if (MH_KEYS.indexOf(k) !== -1) localStorage.setItem(k, JSON.stringify(data[k]));
+    });
+    if (rerender) {
+      profile = load("skyos_health_profile", { weight: 74, age: 20, sex: "m" });
+      symptoms = load("skyos_health_symptoms", []);
+      applyProfileToUI();
+      renderSymptoms();
+      loadDay();
+      calcCalories();
+      refreshTiles();
+      updateReadiness();
+    }
+  }
+  function mhPullAndApply(rerender) {
+    fetch(MH_SUPABASE_URL + '/rest/v1/app_state?key=eq.' + MH_APP_KEY + '&select=data', {
+      headers: { 'apikey': MH_SUPABASE_KEY, 'Authorization': 'Bearer ' + MH_SUPABASE_KEY }
+    }).then(function (res) { return res.ok ? res.json() : []; })
+      .then(function (rows) {
+        const row = rows && rows[0];
+        if (!row || !row.data) return;
+        mhApplyRemote(row.data, rerender);
+      }).catch(function () {});
+  }
+  function mhStartPolling() {
+    setInterval(function () { mhPullAndApply(true); }, 15000);
+  }
+  function mhStartRealtime() {
+    if (!window.supabase) return;
+    try {
+      const supa = window.supabase.createClient(MH_SUPABASE_URL, MH_SUPABASE_KEY);
+      supa.channel('app_state_' + MH_APP_KEY)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.' + MH_APP_KEY
+        }, function (payload) {
+          if (!payload.new || !payload.new.data) return;
+          mhApplyRemote(payload.new.data, true);
+        })
+        .subscribe();
+    } catch (e) {}
+  }
+
+  /* ============================================================
+     INIT + EVENTS
+     ============================================================ */
+  function init() {
+    $("mhDateSub").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" }) + " · all values entered manually";
+    applyProfileToUI();
+    renderSymptoms();
+    loadDay();
+    calcCalories();
+    refreshTiles();
+    updateReadiness();
+
+    // Live updates
+    ["mhWDur", "mhWHr", "mhWDist"].forEach(i => $(i).addEventListener("input", () => { calcCalories(); }));
+    ["mhSDeep", "mhSRem", "mhSLight", "mhVRhr", "mhVWeight", "mhVMood"].forEach(i => $(i).addEventListener("input", refreshTiles));
+    $("mhSQual").addEventListener("input", () => { $("mhSQualOut").textContent = $("mhSQual").value + "/10"; refreshTiles(); updateReadiness(); });
+    $("mhVEnergy").addEventListener("input", () => { $("mhVEnergyOut").textContent = $("mhVEnergy").value; refreshTiles(); });
+
+    // Profile
+    $("mhGearBtn").onclick = () => $("mhSettings").classList.toggle("open");
+    ["mhPWeight", "mhPAge"].forEach(i => $(i).addEventListener("input", () => {
+      profile.weight = num($("mhPWeight").value) || profile.weight;
+      profile.age = num($("mhPAge").value) || profile.age;
+      save("skyos_health_profile", profile); calcCalories();
+    }));
+    document.querySelectorAll("#mhSexSeg button").forEach(b => b.onclick = () => {
+      profile.sex = b.dataset.sex; save("skyos_health_profile", profile);
+      applyProfileToUI(); calcCalories();
+    });
+
+    // Symptoms
+    $("mhAddSymBtn").onclick = addSymptom;
+
+    // Save
+    $("mhSaveBtn").onclick = saveDay;
+    $("mhResetBtn").onclick = resetDay;
+
+    // Cross-device sync
+    mhPullAndApply(true);
+    mhStartPolling();
+    mhStartRealtime();
+  }
+  init();
 })();
 </script>
 
