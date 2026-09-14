@@ -30,15 +30,14 @@ const CONFIG = {
   // Training split. Most people use Push/Pull/Legs but you can rename
   // these to "Upper", "Lower", "Full Body", "Day A", anything.
   days: [
-    { id: "push", name: "Push" },
-    { id: "pull", name: "Pull" },
-    { id: "legs", name: "Legs" }
+    { id: "upper", name: "Upper Body" },
+    { id: "lower", name: "Lower Body" }
   ],
 
   // Split rotation — the order your training days cycle through. Use day
   // ids from `days` above, plus "rest" for off-days. The pill at the top
   // of the app reads this + splitAnchor to compute "what day is today".
-  splitRotation: ["push", "pull", "legs", "rest"],
+  splitRotation: ["upper", "lower", "rest"],
 
   // Anchor: pair a real calendar date with which split day fell on it.
   // The rotation advances from this point. Set `date` to a recent day
@@ -77,15 +76,15 @@ const CONFIG = {
   // First-run defaults. Once a user logs anything, they edit through
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
-    { name: "Bench press",     gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60 },
-    { name: "Overhead press",  gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35 },
-    { name: "Tricep pushdown", gym: "comm", day: "push", repMin: 8, repMax: 12, step: 2.5, startWeight: 25 },
-    { name: "Pull-ups",        gym: "both", day: "pull", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true },
-    { name: "Barbell row",     gym: "comm", day: "pull", repMin: 6, repMax: 10, step: 2.5, startWeight: 50 },
-    { name: "Bicep curl",      gym: "comm", day: "pull", repMin: 8, repMax: 12, step: 1.25,startWeight: 15 },
-    { name: "Back squat",      gym: "comm", day: "legs", repMin: 5, repMax: 8,  step: 5,   startWeight: 80 },
-    { name: "Romanian deadlift", gym: "comm", day: "legs", repMin: 6, repMax: 10, step: 5, startWeight: 60 },
-    { name: "Leg press",       gym: "comm", day: "legs", repMin: 8, repMax: 12, step: 5,   startWeight: 100 }
+    { name: "Bench press",     gym: "comm", day: "upper", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60 },
+    { name: "Overhead press",  gym: "comm", day: "upper", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35 },
+    { name: "Tricep pushdown", gym: "comm", day: "upper", repMin: 8, repMax: 12, step: 2.5, startWeight: 25 },
+    { name: "Pull-ups",        gym: "both", day: "upper", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true },
+    { name: "Barbell row",     gym: "comm", day: "upper", repMin: 6, repMax: 10, step: 2.5, startWeight: 50 },
+    { name: "Bicep curl",      gym: "comm", day: "upper", repMin: 8, repMax: 12, step: 1.25,startWeight: 15 },
+    { name: "Back squat",      gym: "comm", day: "lower", repMin: 5, repMax: 8,  step: 5,   startWeight: 80 },
+    { name: "Romanian deadlift", gym: "comm", day: "lower", repMin: 6, repMax: 10, step: 5, startWeight: 60 },
+    { name: "Leg press",       gym: "comm", day: "lower", repMin: 8, repMax: 12, step: 5,   startWeight: 100 }
   ]
 };
 </script>
@@ -1718,8 +1717,74 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) {}
     return normalize({});
   }
+  // One-time migration: old Push/Pull/Legs saves -> Upper/Lower. CONFIG
+  // only seeds brand-new installs (normalize() below keeps existing
+  // s.days/s.exercises as-is), so returning users' already-saved split
+  // needs to be rewritten in place, once, instead of just changing CONFIG.
+  function migratePushPullLegs(s) {
+    if (s._migratedUpperLowerV1) return s;
+    const days = Array.isArray(s.days) ? s.days : [];
+    const pushDay = days.find(d => d.id === 'push');
+    const pullDay = days.find(d => d.id === 'pull');
+    const legsDay = days.find(d => d.id === 'legs');
+    if (!pushDay && !pullDay && !legsDay) {
+      s._migratedUpperLowerV1 = true;
+      return s;
+    }
+    const otherDays = days.filter(d => d !== pushDay && d !== pullDay && d !== legsDay);
+    s.days = [{ id: 'upper', name: 'Upper Body' }, { id: 'lower', name: 'Lower Body' }].concat(otherDays);
+
+    (s.exercises || []).forEach(ex => {
+      if (ex.day === 'push' || ex.day === 'pull') ex.day = 'upper';
+      else if (ex.day === 'legs') ex.day = 'lower';
+    });
+
+    if (s.filterDay === 'push' || s.filterDay === 'pull') s.filterDay = 'upper';
+    else if (s.filterDay === 'legs') s.filterDay = 'lower';
+
+    if (Array.isArray(s.splitRotation) && s.splitRotation.length) {
+      const oldRot = s.splitRotation.slice();
+      const oldAnchorIdx = (s.splitAnchor && typeof s.splitAnchor.index === 'number') ? s.splitAnchor.index : 0;
+      const anchorName = oldRot[oldAnchorIdx];
+      const isPush = n => /^push\b/i.test(n) || (pushDay && n.toLowerCase() === pushDay.name.toLowerCase());
+      const isPull = n => /^pull\b/i.test(n) || (pullDay && n.toLowerCase() === pullDay.name.toLowerCase());
+      const isLegs = n => /^legs?\b/i.test(n) || (legsDay && n.toLowerCase() === legsDay.name.toLowerCase());
+
+      let placedUpper = false;
+      const newRot = [];
+      oldRot.forEach(name => {
+        if (isPush(name) || isPull(name)) {
+          if (!placedUpper) { newRot.push('Upper Body'); placedUpper = true; }
+        } else if (isLegs(name)) {
+          newRot.push('Lower Body');
+        } else {
+          newRot.push(name);
+        }
+      });
+      if (!newRot.length) newRot.push('Upper Body', 'Lower Body', 'Rest');
+
+      let newAnchorIdx = 0;
+      if (anchorName != null) {
+        if (isPush(anchorName) || isPull(anchorName)) newAnchorIdx = newRot.indexOf('Upper Body');
+        else if (isLegs(anchorName)) newAnchorIdx = newRot.indexOf('Lower Body');
+        else newAnchorIdx = newRot.indexOf(anchorName);
+      }
+      if (newAnchorIdx < 0) newAnchorIdx = 0;
+
+      s.splitRotation = newRot;
+      s.splitAnchor = {
+        date: (s.splitAnchor && s.splitAnchor.date) || new Date().toISOString().slice(0, 10),
+        index: newAnchorIdx
+      };
+    }
+
+    s._migratedUpperLowerV1 = true;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) {}
+    return s;
+  }
   function normalize(s) {
     s = s || {};
+    s = migratePushPullLegs(s);
     s.units = s.units || CONFIG.units || 'kg';
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
