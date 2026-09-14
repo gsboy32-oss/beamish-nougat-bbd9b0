@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>SkyOS Lernen</title>
+
+<!-- =============================================================
+     ANNAHMEN (KONTEXT-Platzhalter im Build-Prompt waren leer):
+     - Fach: nicht angegeben -> Standardwert "Allgemein", in den
+       Einstellungen frei editierbar, wirkt sich nur auf Anzeige
+       und System-Prompt-Kontext aus, nicht auf die Logik.
+     - Pruefungstermin: nicht angegeben -> zunaechst leer. Ohne
+       Termin bleibt der Cram-Modus inaktiv (normales Spaced
+       Repetition laeuft immer); sobald ein Termin gesetzt wird,
+       rechnet das Modul rueckwaerts.
+     - Verfuegbare Lernzeit: nicht angegeben -> Standard 60 Min/Tag,
+       in den Einstellungen editierbar (Minuten/Tag, kein 50:10-Timer
+       als hartes Limit, der Session-Timer selbst bleibt 50/10 fix
+       wie im Auftrag beschrieben).
+     - Modell-String "claude-sonnet-4-6" wird wortwoertlich wie im
+       Auftrag verwendet; ueber Einstellungen ueberschreibbar, falls
+       sich Anthropic-Modellnamen aendern.
+     - API-Aufrufe laufen direkt aus dem Browser gegen die Anthropic
+       API und benoetigen daher den Header
+       "anthropic-dangerous-direct-browser-access: true".
+     ============================================================= -->
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.0/mammoth.browser.min.js"></script>
+
+<style>
+:root{
+  --ln-bg:#0a0a0b;
+  --ln-bg-card:#111113;
+  --ln-bg-card2:#17171a;
+  --ln-text-1:#ffffff;
+  --ln-text-2:rgba(255,255,255,.62);
+  --ln-text-3:rgba(255,255,255,.42);
+  --ln-text-4:rgba(255,255,255,.24);
+  --ln-border:rgba(255,255,255,.09);
+  --ln-border-2:rgba(255,255,255,.16);
+  --ln-accent:#7c9cff;
+  --ln-accent-dim:rgba(124,156,255,.16);
+  --ln-good:#5ad3a8;
+  --ln-warn:#f0b95c;
+  --ln-bad:#f26d6d;
+  --ln-radius:16px;
+  --ln-radius-sm:10px;
+  --ln-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--ln-bg);color:var(--ln-text-1);font-family:var(--ln-font);}
+body{min-height:100vh;overflow-x:hidden;}
+a{color:inherit;}
+button{font-family:inherit;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px;}
+:focus-visible{outline:2px solid var(--ln-accent);outline-offset:2px;border-radius:6px;}
+
+.ln-glass{
+  background:rgba(255,255,255,.035);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--ln-border);
+  border-radius:var(--ln-radius);
+}
+
+/* ---------- shell layout ---------- */
+.ln-shell{display:flex;min-height:100vh;padding-top:max(0px, var(--safe-t));}
+.ln-sidebar{
+  width:220px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:4px;
+  padding:24px 14px;
+  border-right:1px solid var(--ln-border);
+  position:sticky;top:0;height:100vh;
+}
+.ln-sidebar-title{font-size:15px;font-weight:700;letter-spacing:.02em;padding:0 10px 18px;color:var(--ln-text-1);}
+.ln-nav-btn{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 12px;border-radius:var(--ln-radius-sm);
+  background:transparent;border:none;color:var(--ln-text-2);
+  font-size:14px;font-weight:600;text-align:left;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.ln-nav-btn svg{width:18px;height:18px;flex-shrink:0;}
+.ln-nav-btn:hover{background:rgba(255,255,255,.05);color:var(--ln-text-1);}
+.ln-nav-btn.active{background:var(--ln-accent-dim);color:var(--ln-accent);}
+.ln-sidebar-spacer{flex:1;}
+.ln-streak-chip{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;
+  font-size:12px;color:var(--ln-text-3);
+}
+
+.ln-main{flex:1;min-width:0;padding:28px 28px calc(28px + var(--safe-b)) 28px;}
+.ln-view{display:none;}
+.ln-view.active{display:block;}
+.ln-page-title{font-size:22px;font-weight:800;margin:0 0 4px;}
+.ln-page-sub{font-size:13.5px;color:var(--ln-text-3);margin:0 0 24px;}
+
+/* ---------- mobile: sidebar collapses to bottom bar ---------- */
+.ln-mobile-topbar{display:none;}
+@media (max-width:900px){
+  .ln-shell{flex-direction:column;}
+  .ln-sidebar{
+    position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;
+    flex-direction:row;justify-content:space-around;
+    width:100%;padding:8px max(8px,var(--safe-r)) calc(8px + var(--safe-b)) max(8px,var(--safe-l));
+    border-right:none;border-top:1px solid var(--ln-border);
+    background:rgba(10,10,11,.92);backdrop-filter:blur(16px);
+    z-index:40;gap:2px;
+  }
+  .ln-sidebar-title,.ln-sidebar-spacer,.ln-streak-chip{display:none;}
+  .ln-nav-btn{flex-direction:column;gap:4px;font-size:10px;padding:7px 4px;min-width:0;flex:1;text-align:center;justify-content:center;}
+  .ln-nav-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .ln-main{padding:16px 14px calc(84px + var(--safe-b)) 14px;}
+  .ln-mobile-topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:calc(10px + var(--safe-t)) 14px 10px;
+    border-bottom:1px solid var(--ln-border);
+  }
+  .ln-mobile-topbar strong{font-size:15px;}
+}
+
+/* ---------- site-wide cross-page nav (top, matches finance.html pattern) ---------- */
+.site-tabbar-top{
+  display:flex;gap:6px;align-items:center;overflow-x:auto;
+  padding:10px max(14px,var(--safe-r)) 10px max(14px,var(--safe-l));
+  border-bottom:1px solid var(--ln-border);
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.site-tabbar-top::-webkit-scrollbar{display:none;}
+.site-tabbar-top a{
+  flex-shrink:0;font-size:12px;font-weight:600;color:var(--ln-text-3);
+  padding:6px 10px;border-radius:999px;text-decoration:none;white-space:nowrap;
+}
+.site-tabbar-top a:hover{color:var(--ln-text-1);background:rgba(255,255,255,.05);}
+.site-tabbar-top a.current{color:var(--ln-accent);background:var(--ln-accent-dim);}
+
+/* ---------- Heute view ---------- */
+.ln-heute-hero{
+  padding:36px 28px;text-align:center;margin-bottom:20px;
+}
+.ln-heute-hero .ln-count{font-size:15px;color:var(--ln-text-3);margin-bottom:16px;}
+.ln-primary-btn{
+  appearance:none;border:none;cursor:pointer;
+  background:var(--ln-accent);color:#0a0a0b;font-weight:800;font-size:17px;
+  padding:18px 34px;border-radius:999px;
+  box-shadow:0 8px 24px rgba(124,156,255,.28);
+  transition:transform .12s;
+}
+.ln-primary-btn:hover{transform:translateY(-1px);}
+.ln-primary-btn:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none;}
+.ln-heute-hero .ln-sub{font-size:13px;color:var(--ln-text-3);margin-top:14px;}
+.ln-cram-banner{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:14px 16px;border-radius:var(--ln-radius-sm);
+  background:rgba(242,109,109,.1);border:1px solid rgba(242,109,109,.28);
+  color:#ffc9c9;font-size:13px;margin-bottom:18px;
+}
+.ln-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+.ln-stat-card{padding:18px;}
+.ln-stat-card .n{font-size:26px;font-weight:800;}
+.ln-stat-card .l{font-size:12px;color:var(--ln-text-3);margin-top:4px;}
+
+/* ---------- Lernen (session) view ---------- */
+.ln-session-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:16px;flex-wrap:wrap;}
+.ln-timer-ring{position:relative;width:52px;height:52px;flex-shrink:0;}
+.ln-timer-ring svg{transform:rotate(-90deg);}
+.ln-timer-ring circle{fill:none;stroke-width:4;}
+.ln-timer-ring .bg{stroke:rgba(255,255,255,.08);}
+.ln-timer-ring .fg{stroke:var(--ln-accent);stroke-linecap:round;transition:stroke-dashoffset .3s;}
+.ln-timer-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--ln-text-2);}
+.ln-progress-text{font-size:12.5px;color:var(--ln-text-3);}
+.ln-card-stage{min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;position:relative;}
+.ln-card-topic{position:absolute;top:16px;left:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ln-text-4);}
+.ln-card-type{position:absolute;top:16px;right:20px;font-size:11px;font-weight:700;color:var(--ln-accent);}
+.ln-card-front{font-size:23px;line-height:1.5;text-align:center;font-weight:650;max-width:640px;}
+.ln-card-front .cloze{color:var(--ln-accent);border-bottom:2px dashed var(--ln-accent);padding:0 2px;}
+.ln-card-back{font-size:19px;line-height:1.6;text-align:center;max-width:640px;color:var(--ln-text-1);margin-top:22px;padding-top:22px;border-top:1px solid var(--ln-border);}
+.ln-card-back ol,.ln-card-back ul{text-align:left;display:inline-block;}
+.ln-card-source{font-size:11.5px;color:var(--ln-text-4);margin-top:18px;}
+.ln-flip-hint{font-size:12px;color:var(--ln-text-4);margin-top:24px;}
+.ln-rate-row{display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap;}
+.ln-rate-btn{
+  appearance:none;border:1px solid var(--ln-border-2);background:rgba(255,255,255,.03);
+  color:var(--ln-text-1);border-radius:12px;padding:12px 18px;font-weight:700;font-size:13.5px;
+  cursor:pointer;min-width:104px;transition:background .15s,border-color .15s;
+}
+.ln-rate-btn small{display:block;font-weight:500;color:var(--ln-text-3);font-size:11px;margin-top:2px;}
+.ln-rate-btn[data-r="0"]{border-color:rgba(242,109,109,.4);} .ln-rate-btn[data-r="0"]:hover{background:rgba(242,109,109,.12);}
+.ln-rate-btn[data-r="1"]{border-color:rgba(240,185,92,.4);} .ln-rate-btn[data-r="1"]:hover{background:rgba(240,185,92,.12);}
+.ln-rate-btn[data-r="2"]{border-color:rgba(90,211,168,.4);} .ln-rate-btn[data-r="2"]:hover{background:rgba(90,211,168,.12);}
+.ln-rate-btn[data-r="3"]{border-color:rgba(124,156,255,.4);} .ln-rate-btn[data-r="3"]:hover{background:rgba(124,156,255,.12);}
+.ln-explain-btn{margin-top:16px;background:transparent;border:1px solid var(--ln-border-2);color:var(--ln-text-2);border-radius:999px;padding:8px 16px;font-size:12.5px;cursor:pointer;}
+.ln-explain-box{margin-top:16px;padding:14px 16px;background:rgba(124,156,255,.08);border:1px solid rgba(124,156,255,.2);border-radius:var(--ln-radius-sm);font-size:13.5px;color:var(--ln-text-2);max-width:600px;text-align:left;}
+.ln-mc-options{display:flex;flex-direction:column;gap:8px;max-width:520px;width:100%;margin-top:18px;}
+.ln-mc-opt{padding:12px 14px;border:1px solid var(--ln-border-2);border-radius:var(--ln-radius-sm);text-align:left;background:rgba(255,255,255,.02);cursor:pointer;font-size:14px;}
+.ln-mc-opt:hover{background:rgba(255,255,255,.05);}
+.ln-mc-opt.correct{border-color:var(--ln-good);background:rgba(90,211,168,.1);}
+.ln-mc-opt.wrong{border-color:var(--ln-bad);background:rgba(242,109,109,.1);}
+.ln-empty-session{text-align:center;padding:60px 20px;color:var(--ln-text-3);}
+
+/* ---------- Bibliothek ---------- */
+.ln-lib-toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.ln-search{flex:1;min-width:180px;background:rgba(255,255,255,.04);border:1px solid var(--ln-border-2);border-radius:999px;padding:9px 16px;color:var(--ln-text-1);font-size:13.5px;}
+.ln-btn{appearance:none;border:1px solid var(--ln-border-2);background:rgba(255,255,255,.04);color:var(--ln-text-1);border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+.ln-btn:hover{background:rgba(255,255,255,.08);}
+.ln-btn.primary{background:var(--ln-accent);color:#0a0a0b;border-color:transparent;}
+.ln-deck-row{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:10px;}
+.ln-deck-row .name{font-weight:700;font-size:14px;flex-shrink:0;min-width:140px;}
+.ln-bar{flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;min-width:60px;}
+.ln-bar>div{height:100%;background:var(--ln-accent);}
+.ln-deck-row .pct{font-size:12px;color:var(--ln-text-3);width:70px;text-align:right;flex-shrink:0;}
+.ln-topic-chip{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--ln-text-3);margin:2px 4px 2px 0;}
+.ln-card-list-row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--ln-border);font-size:13.5px;}
+.ln-card-list-row .front{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ln-card-list-row .tag{font-size:10.5px;color:var(--ln-text-4);flex-shrink:0;}
+.ln-mini-icon-btn{background:none;border:none;color:var(--ln-text-3);cursor:pointer;padding:4px 6px;font-size:14px;}
+.ln-mini-icon-btn:hover{color:var(--ln-text-1);}
+.ln-leech-row{background:rgba(242,109,109,.06);}
+
+/* ---------- Statistik ---------- */
+.ln-chart-wrap{padding:20px;margin-bottom:20px;}
+.ln-chart-legend{display:flex;gap:16px;font-size:11.5px;color:var(--ln-text-3);margin-top:10px;}
+.ln-chart-legend span{display:inline-flex;align-items:center;gap:6px;}
+.ln-swatch{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.ln-limit-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:13px;color:var(--ln-text-2);}
+.ln-heatmap{display:grid;grid-template-columns:repeat(30,1fr);gap:3px;}
+.ln-heatmap div{aspect-ratio:1;border-radius:2px;background:rgba(255,255,255,.06);}
+.ln-weak-topic-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--ln-border);font-size:13.5px;}
+.ln-weak-topic-row .t{flex:1;}
+.ln-weak-topic-row .r{color:var(--ln-bad);font-weight:700;font-size:12px;}
+
+/* ---------- import / dropzone ---------- */
+.ln-dropzone{
+  border:2px dashed var(--ln-border-2);border-radius:var(--ln-radius);
+  padding:40px 20px;text-align:center;color:var(--ln-text-3);cursor:pointer;
+  transition:border-color .15s,background .15s;margin-bottom:20px;
+}
+.ln-dropzone.drag{border-color:var(--ln-accent);background:var(--ln-accent-dim);}
+.ln-dropzone strong{color:var(--ln-text-1);display:block;margin-bottom:6px;font-size:15px;}
+.ln-import-row{display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:8px;}
+.ln-import-row .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;}
+.ln-import-row .status{font-size:11.5px;color:var(--ln-text-3);flex-shrink:0;}
+.ln-import-row .pbar{width:110px;height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0;}
+.ln-import-row .pbar>div{height:100%;background:var(--ln-accent);transition:width .2s;}
+.ln-import-row.failed .status{color:var(--ln-bad);}
+.ln-import-row.done .status{color:var(--ln-good);}
+
+/* ---------- modals ---------- */
+.ln-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px);}
+.ln-modal-bg.show{display:flex;}
+.ln-modal{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;padding:26px;background:#131316;border:1px solid var(--ln-border-2);border-radius:20px;}
+.ln-modal h2{margin:0 0 18px;font-size:17px;}
+.ln-field{margin-bottom:16px;}
+.ln-field label{display:block;font-size:12.5px;font-weight:700;color:var(--ln-text-2);margin-bottom:6px;}
+.ln-field input[type=text],.ln-field input[type=password],.ln-field input[type=date],.ln-field input[type=number],.ln-field textarea,.ln-field select{
+  width:100%;background:rgba(255,255,255,.05);border:1px solid var(--ln-border-2);border-radius:10px;
+  padding:10px 12px;color:var(--ln-text-1);font-size:14px;font-family:inherit;
+}
+.ln-field textarea{min-height:90px;resize:vertical;}
+.ln-field .hint{font-size:11.5px;color:var(--ln-text-4);margin-top:5px;}
+.ln-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+@media (max-width:900px){ .ln-modal-bg{align-items:flex-end;padding:0;} .ln-modal{max-width:none;border-radius:20px 20px 0 0;max-height:90vh;} }
+
+/* ---------- review step ---------- */
+.ln-review-card{padding:16px 18px;margin-bottom:10px;}
+.ln-review-card .top{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.ln-review-card .front{font-weight:700;font-size:14.5px;}
+.ln-review-card .back{font-size:13.5px;color:var(--ln-text-2);margin-top:4px;}
+.ln-review-actions{display:flex;gap:8px;margin-top:10px;}
+
+/* ---------- toast / errors ---------- */
+.ln-toast-wrap{position:fixed;bottom:calc(20px + var(--safe-b));left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;width:min(420px,92vw);}
+@media (max-width:900px){ .ln-toast-wrap{bottom:calc(96px + var(--safe-b));} }
+.ln-toast{padding:13px 16px;border-radius:12px;font-size:13px;line-height:1.4;background:#1c1c20;border:1px solid var(--ln-border-2);box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.ln-toast.err{border-color:rgba(242,109,109,.4);background:rgba(242,109,109,.1);}
+.ln-toast .next{color:var(--ln-text-3);font-size:11.5px;margin-top:4px;}
+
+.ln-empty{text-align:center;padding:50px 20px;color:var(--ln-text-3);}
+.ln-empty strong{display:block;color:var(--ln-text-1);font-size:15px;margin-bottom:6px;}
+</style>
+</head>
+<body>
+
+<div class="ln-shell">
+  <nav class="ln-sidebar ln-glass" id="lnSidebar" aria-label="Lernen Navigation">
+    <div class="ln-sidebar-title">SkyOS Lernen</div>
+    <button class="ln-nav-btn active" data-view="heute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Heute</span></button>
+    <button class="ln-nav-btn" data-view="lernen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg><span>Lernen</span></button>
+    <button class="ln-nav-btn" data-view="bibliothek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h11l3 3v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M8 3v14"/></svg><span>Bibliothek</span></button>
+    <button class="ln-nav-btn" data-view="statistik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg><span>Statistik</span></button>
+    <div class="ln-sidebar-spacer"></div>
+    <button class="ln-nav-btn" id="lnSettingsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/></svg><span>Einstellungen</span></button>
+    <div class="ln-streak-chip"><span id="lnStreakVal">0</span>&nbsp;Tage Streak</div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+    <div class="ln-mobile-topbar site-tabbar-top" id="lnMobileTop"><strong>SkyOS Lernen</strong></div>
+    <div class="site-tabbar-top" id="lnSiteNav" style="display:none;"></div>
+
+    <main class="ln-main">
+      <!-- HEUTE -->
+      <section class="ln-view active" id="view-heute">
+        <div id="lnCramBanner" class="ln-cram-banner" style="display:none;"></div>
+        <div class="ln-glass ln-heute-hero">
+          <div class="ln-count" id="lnHeuteCount">Lade Queue…</div>
+          <button class="ln-primary-btn" id="lnStartBtn">Session starten</button>
+          <div class="ln-sub" id="lnHeuteSub"></div>
+        </div>
+        <div class="ln-stat-row">
+          <div class="ln-glass ln-stat-card"><div class="n" id="lnStatStreak">0</div><div class="l">Streak (Tage)</div></div>
+          <div class="ln-glass ln-stat-card"><div class="n" id="lnStatToday">0</div><div class="l">Heute gelernt</div></div>
+          <div class="ln-glass ln-stat-card"><div class="n" id="lnStatAccuracy">–</div><div class="l">Trefferquote letzte Session</div></div>
+          <div class="ln-glass ln-stat-card"><div class="n" id="lnStatTotal">0</div><div class="l">Karten insgesamt</div></div>
+        </div>
+      </section>
+
+      <!-- LERNEN (Session) -->
+      <section class="ln-view" id="view-lernen">
+        <div id="lnSessionEmpty" class="ln-empty" style="display:none;">
+          <strong>Keine Karten fällig</strong>
+          Importiere neue Unterlagen in der Bibliothek oder komm später wieder — hier siehst du sofort, sobald etwas ansteht.
+          <div style="margin-top:14px;"><button class="ln-btn primary" data-goto="bibliothek">Zur Bibliothek</button></div>
+        </div>
+        <div id="lnSessionActive">
+          <div class="ln-session-bar">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="ln-timer-ring">
+                <svg width="52" height="52"><circle class="bg" cx="26" cy="26" r="22"/><circle class="fg" id="lnTimerCircle" cx="26" cy="26" r="22" stroke-dasharray="138.2" stroke-dashoffset="0"/></svg>
+                <div class="ln-timer-label" id="lnTimerLabel">50:00</div>
+              </div>
+              <div class="ln-progress-text" id="lnProgressText">Karte 1 von 1</div>
+            </div>
+            <button class="ln-btn" id="lnEndSessionBtn">Session beenden</button>
+          </div>
+          <div class="ln-glass ln-card-stage" id="lnCardStage" tabindex="0"></div>
+        </div>
+      </section>
+
+      <!-- BIBLIOTHEK -->
+      <section class="ln-view" id="view-bibliothek">
+        <div class="ln-dropzone" id="lnDropzone">
+          <strong>Dateien hierher ziehen oder klicken</strong>
+          PDF, DOCX, TXT, Markdown, Bilder — mehrere gleichzeitig möglich.
+          <input type="file" id="lnFileInput" multiple accept=".pdf,.docx,.txt,.md,.markdown,image/*" style="display:none;">
+        </div>
+        <div id="lnImportProgress"></div>
+        <div id="lnReviewStep" style="display:none;">
+          <h2 style="font-size:16px;margin:22px 0 12px;">Neue Karten prüfen</h2>
+          <div id="lnReviewList"></div>
+          <div class="ln-modal-actions" style="justify-content:flex-start;">
+            <button class="ln-btn primary" id="lnReviewFinishBtn">Lernen starten</button>
+            <span id="lnReviewCount" style="align-self:center;font-size:12.5px;color:var(--ln-text-3);"></span>
+          </div>
+        </div>
+
+        <div class="ln-lib-toolbar">
+          <input type="text" class="ln-search" id="lnSearch" placeholder="Karten durchsuchen…">
+          <button class="ln-btn" id="lnExportJsonBtn">Export JSON</button>
+          <button class="ln-btn" id="lnExportCsvBtn">Export Anki-CSV</button>
+          <button class="ln-btn" id="lnImportJsonBtn">Import JSON</button>
+          <input type="file" id="lnImportJsonFile" accept=".json" style="display:none;">
+        </div>
+        <div id="lnDeckList"></div>
+        <div id="lnCardSearchResults"></div>
+      </section>
+
+      <!-- STATISTIK -->
+      <section class="ln-view" id="view-statistik">
+        <div class="ln-glass ln-chart-wrap">
+          <h2 style="font-size:15px;margin:0 0 4px;">Inflow-Prognose (30 Tage)</h2>
+          <p style="font-size:12px;color:var(--ln-text-3);margin:0 0 14px;">Prognostizierte Wiederholungen pro Tag gegen dein Zeitbudget.</p>
+          <div class="ln-limit-row">
+            Neue Karten / Tag:
+            <input type="number" id="lnNewLimitInput" min="0" max="200" style="width:70px;background:rgba(255,255,255,.05);border:1px solid var(--ln-border-2);border-radius:8px;padding:6px 8px;color:#fff;">
+            <span id="lnImpactText" style="color:var(--ln-text-3);"></span>
+          </div>
+          <canvas id="lnInflowChart" width="900" height="220" style="width:100%;height:220px;"></canvas>
+          <div class="ln-chart-legend">
+            <span><i class="ln-swatch" style="background:var(--ln-accent);"></i>Prognostizierte Last</span>
+            <span><i class="ln-swatch" style="background:var(--ln-warn);"></i>Zeitbudget-Linie</span>
+          </div>
+        </div>
+        <div class="ln-glass ln-chart-wrap">
+          <h2 style="font-size:15px;margin:0 0 12px;">Aktivität, letzte 90 Tage</h2>
+          <div class="ln-heatmap" id="lnHeatmap"></div>
+        </div>
+        <div class="ln-glass ln-chart-wrap">
+          <h2 style="font-size:15px;margin:0 0 4px;">Schwächste Themen</h2>
+          <p style="font-size:12px;color:var(--ln-text-3);margin:0 0 10px;">Nach Fehlerquote der letzten Wiederholungen.</p>
+          <div id="lnWeakTopics"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="ln-modal-bg" id="lnSettingsModalBg">
+  <div class="ln-modal">
+    <h2>Einstellungen</h2>
+    <div class="ln-field">
+      <label for="lnApiKey">Anthropic API-Key</label>
+      <input type="password" id="lnApiKey" placeholder="sk-ant-…">
+      <div class="hint">Der Key bleibt ausschließlich lokal in deinem Browser (localStorage) und wird nirgendwo sonst gespeichert.</div>
+    </div>
+    <div class="ln-field">
+      <label for="lnModelInput">Modell</label>
+      <input type="text" id="lnModelInput" value="claude-sonnet-4-6">
+    </div>
+    <div class="ln-field">
+      <label for="lnSubjectInput">Fach</label>
+      <input type="text" id="lnSubjectInput" placeholder="z. B. Allgemeine und Anorganische Chemie">
+    </div>
+    <div class="ln-field">
+      <label for="lnExamDateInput">Prüfungstermin</label>
+      <input type="date" id="lnExamDateInput">
+      <div class="hint">Leer lassen, um den Cram-Modus deaktiviert zu lassen.</div>
+    </div>
+    <div class="ln-field">
+      <label for="lnBudgetInput">Verfügbare Lernzeit (Minuten/Tag)</label>
+      <input type="number" id="lnBudgetInput" min="5" max="600" value="60">
+    </div>
+    <div class="ln-field">
+      <label for="lnNewLimitSettingsInput">Neue Karten / Tag (Obergrenze)</label>
+      <input type="number" id="lnNewLimitSettingsInput" min="0" max="200" value="20">
+    </div>
+    <div class="ln-modal-actions">
+      <button class="ln-btn" id="lnSettingsCancelBtn">Schließen</button>
+      <button class="ln-btn primary" id="lnSettingsSaveBtn">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- CARD EDIT MODAL -->
+<div class="ln-modal-bg" id="lnCardEditModalBg">
+  <div class="ln-modal">
+    <h2>Karte bearbeiten</h2>
+    <div class="ln-field"><label>Vorderseite</label><textarea id="lnEditFront"></textarea></div>
+    <div class="ln-field"><label>Rückseite</label><textarea id="lnEditBack"></textarea></div>
+    <div class="ln-field"><label>Tags (Komma-getrennt)</label><input type="text" id="lnEditTags"></div>
+    <div class="ln-modal-actions">
+      <button class="ln-btn" id="lnEditCancelBtn">Abbrechen</button>
+      <button class="ln-btn primary" id="lnEditSaveBtn">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="ln-toast-wrap" id="lnToastWrap"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   KONSTANTEN
+   ============================================================ */
+const DB_NAME = 'skyos_lernen_db';
+const DB_VERSION = 1;
+const STORES = ['sources','chunks','decks','cards','examQuestions','reviews'];
+const LS_SETTINGS = 'skyos_lernen_settings';
+const LS_STREAK = 'skyos_lernen_streak';
+const CHUNK_CHARS = 8000;      // ~2000 Tokens bei ~4 Zeichen/Token
+const CHUNK_OVERLAP_CHARS = 600; // ~150 Tokens
+const MAX_CONCURRENT = 3;
+const MAX_FILE_MB = 60;
+const SECONDS_PER_CARD_ESTIMATE = 12; // fuer Minutenschaetzung in der Inflow-Prognose
+const LEECH_THRESHOLD = 6;
+const SESSION_WORK_MIN = 50;
+const SESSION_BREAK_MIN = 10;
+
+const SYSTEM_PROMPT = `Du erstellst Lernmaterial für einen Pharmaziestudenten aus einem Auszug seiner Vorlesungsunterlagen. Gib ausschließlich ein JSON-Objekt zurück, ohne Fließtext, ohne Markdown-Backticks.
+
+Regeln:
+- Nur Inhalte aus dem Auszug. Nichts ergänzen, was nicht dort steht.
+- Eine Karte prüft genau eine Sache. Keine Sammelfragen, keine Ja/Nein-Fragen.
+- Frageseite ohne Kontextlücke: aus der Frage allein muss klar sein, was gemeint ist.
+- Antwortseite kurz, aber vollständig. Ein Satz oder eine knappe Liste.
+- Definitionen und feste Fakten als Cloze mit {{c1::...}}. Mechanismen, Zusammenhänge und Ursache-Wirkung als Frage-Antwort-Karte.
+- Reihenfolgen, Klassifikationen und Synthesewege als Karte mit Schritten, nicht als eine Karte pro Schritt.
+- Zahlenwerte nur, wenn sie im Auszug prüfungsrelevant hervorgehoben sind.
+- Bei Wirkstoffen: Substanzklasse, Wirkmechanismus, Indikation und wichtigste unerwünschte Wirkung sind je eine eigene Karte, sofern im Text vorhanden.
+- Fehlerträchtige Verwechslungspaare aktiv abfragen (z. B. ähnliche Namen, ähnliche Mechanismen).
+
+Schema:
+{
+  "topic": "string",
+  "summary": "3-6 Sätze, die Kernaussage des Abschnitts",
+  "key_terms": [{"term": "string", "definition": "string"}],
+  "cards": [{"type": "qa" | "cloze" | "list", "front": "string", "back": "string", "difficulty": 1, "tags": ["string"], "source_page": 0}],
+  "exam_questions": [{"type": "mc" | "open", "question": "string", "options": ["string"], "correct": 0, "model_answer": "string", "explanation": "string", "source_page": 0}]
+}
+
+Dichte: pro 500 Wörtern etwa 6–10 Karten und 2 Prüfungsfragen. Bei reinem Füllmaterial lieber weniger. Falsche Antwortoptionen bei MC müssen plausibel sein und typische Verwechslungen abbilden, nie offensichtlich unsinnig.`;
+
+/* ============================================================
+   INDEXEDDB LAYER
+   ============================================================ */
+let dbPromise = null;
+function openDb(){
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('sources')) db.createObjectStore('sources', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('chunks')) {
+        const s = db.createObjectStore('chunks', { keyPath: 'id' });
+        s.createIndex('sourceId', 'sourceId');
+      }
+      if (!db.objectStoreNames.contains('decks')) db.createObjectStore('decks', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('cards')) {
+        const s = db.createObjectStore('cards', { keyPath: 'id' });
+        s.createIndex('deckId', 'deckId');
+        s.createIndex('topic', 'topic');
+      }
+      if (!db.objectStoreNames.contains('examQuestions')) {
+        const s = db.createObjectStore('examQuestions', { keyPath: 'id' });
+        s.createIndex('deckId', 'deckId');
+        s.createIndex('topic', 'topic');
+      }
+      if (!db.objectStoreNames.contains('reviews')) {
+        const s = db.createObjectStore('reviews', { keyPath: 'id' });
+        s.createIndex('cardId', 'cardId');
+        s.createIndex('date', 'date');
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function idbAll(store){
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbGet(store, id){
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, 'readonly').objectStore(store).get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPut(store, val){
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, 'readwrite').objectStore(store).put(val);
+    req.onsuccess = () => resolve(val);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPutMany(store, vals){
+  if (!vals.length) return;
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const os = tx.objectStore(store);
+    vals.forEach(v => os.put(v));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbDelete(store, id){
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, 'readwrite').objectStore(store).delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbClearAll(){
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORES, 'readwrite');
+    STORES.forEach(s => tx.objectStore(s).clear());
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/* ============================================================
+   SETTINGS / UTIL
+   ============================================================ */
+function loadSettings(){
+  try {
+    const raw = localStorage.getItem(LS_SETTINGS);
+    const s = raw ? JSON.parse(raw) : {};
+    return Object.assign({
+      apiKey: '',
+      model: 'claude-sonnet-4-6',
+      subject: 'Allgemein',
+      examDate: '',
+      dailyBudgetMin: 60,
+      newCardLimit: 20
+    }, s);
+  } catch (e) {
+    return { apiKey: '', model: 'claude-sonnet-4-6', subject: 'Allgemein', examDate: '', dailyBudgetMin: 60, newCardLimit: 20 };
+  }
+}
+function saveSettings(s){ try { localStorage.setItem(LS_SETTINGS, JSON.stringify(s)); } catch (e) {} }
+let settings = loadSettings();
+
+function loadStreak(){
+  try { return JSON.parse(localStorage.getItem(LS_STREAK) || '{}'); } catch (e) { return {}; }
+}
+function saveStreak(v){ try { localStorage.setItem(LS_STREAK, JSON.stringify(v)); } catch (e) {} }
+
+function uid(prefix){ return (prefix||'id') + '_' + Date.now() + '_' + Math.floor(Math.random()*99999); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysBetween(a, b){ return Math.round((new Date(b) - new Date(a)) / 86400000); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+function toast(msg, opts){
+  opts = opts || {};
+  const wrap = document.getElementById('lnToastWrap');
+  const el = document.createElement('div');
+  el.className = 'ln-toast' + (opts.error ? ' err' : '');
+  el.innerHTML = '<div>' + escapeHtml(msg) + '</div>' + (opts.next ? '<div class="next">' + escapeHtml(opts.next) + '</div>' : '');
+  wrap.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 320); }, opts.duration || 5200);
+}
+function errKeyMissing(){ toast('Kein API-Key hinterlegt.', { error: true, next: 'Trag ihn in den Einstellungen ein, bevor du importierst.' }); }
+function errNoTextLayer(name){ toast('„' + name + '" hat keinen erkennbaren Textlayer.', { error: true, next: 'Für gescannte PDFs kann Texterkennung (OCR) nachgeladen werden — das dauert je nach Seitenzahl mehrere Minuten.' }); }
+function errRateLimit(){ toast('API-Limit erreicht.', { error: true, next: 'Das Modul versucht es automatisch mit steigender Wartezeit erneut — kein Eingriff nötig.' }); }
+function errFileTooBig(name, mb){ toast('„' + name + '" ist zu groß (' + mb.toFixed(1) + ' MB).', { error: true, next: 'Maximal ' + MAX_FILE_MB + ' MB pro Datei — teile die Datei oder exportiere sie kleiner.' }); }
+
+/* ============================================================
+   EXTRAKTION
+   ============================================================ */
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+
+// Kopf-/Fusszeilen und wiederkehrende Boilerplate erkennen: Zeilen, die auf
+// vielen Seiten identisch vorkommen (z. B. Foliennummern, Kursname im Footer).
+function stripBoilerplate(pages){
+  const lineCount = new Map();
+  pages.forEach(p => {
+    const lines = p.text.split('\n').map(l => l.trim()).filter(Boolean);
+    const uniq = new Set(lines);
+    uniq.forEach(l => lineCount.set(l, (lineCount.get(l) || 0) + 1));
+  });
+  const threshold = Math.max(3, Math.ceil(pages.length * 0.6));
+  const boilerplate = new Set();
+  lineCount.forEach((count, line) => {
+    if (count >= threshold && line.length < 90) boilerplate.add(line);
+  });
+  return pages.map(p => ({
+    page: p.page,
+    text: p.text.split('\n').filter(l => !boilerplate.has(l.trim()) && !/^\s*\d+\s*$/.test(l)).join('\n')
+  }));
+}
+
+async function extractPdf(file){
+  if (!window.pdfjsLib) throw new Error('pdf.js nicht geladen');
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pages = [];
+  let totalChars = 0;
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+    totalChars += text.length;
+    pages.push({ page: i, text });
+  }
+  if (totalChars < doc.numPages * 5) {
+    const err = new Error('NO_TEXT_LAYER');
+    err.code = 'NO_TEXT_LAYER';
+    err.pageCount = doc.numPages;
+    throw err;
+  }
+  return { pages: stripBoilerplate(pages), pageCount: doc.numPages };
+}
+
+async function extractDocx(file){
+  if (!window.mammoth) throw new Error('mammoth.js nicht geladen');
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buf });
+  const text = result.value || '';
+  return { pages: [{ page: 1, text }], pageCount: 1 };
+}
+
+async function extractPlain(file){
+  const text = await file.text();
+  return { pages: [{ page: 1, text }], pageCount: 1 };
+}
+
+let tesseractLoadPromise = null;
+function loadTesseract(){
+  if (window.Tesseract) return Promise.resolve();
+  if (tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return tesseractLoadPromise;
+}
+async function extractImageOcr(file){
+  await loadTesseract();
+  const { data } = await Tesseract.recognize(file, 'deu+eng');
+  return { pages: [{ page: 1, text: data.text || '' }], pageCount: 1 };
+}
+
+async function extractFile(file){
+  const mb = file.size / (1024*1024);
+  if (mb > MAX_FILE_MB) { errFileTooBig(file.name, mb); const e = new Error('FILE_TOO_BIG'); e.code = 'FILE_TOO_BIG'; throw e; }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return extractPdf(file);
+  if (ext === 'docx') return extractDocx(file);
+  if (ext === 'txt' || ext === 'md' || ext === 'markdown') return extractPlain(file);
+  if (file.type.indexOf('image/') === 0) {
+    const useOcr = confirm('„' + file.name + '" ist ein Bild. Texterkennung (OCR) starten? Das kann je nach Größe 1–3 Minuten dauern.');
+    if (!useOcr) { const e = new Error('OCR_DECLINED'); e.code = 'OCR_DECLINED'; throw e; }
+    return extractImageOcr(file);
+  }
+  const e = new Error('UNSUPPORTED_TYPE'); e.code = 'UNSUPPORTED_TYPE'; throw e;
+}
+
+/* ============================================================
+   CHUNKING
+   ============================================================ */
+function detectTopic(text){
+  const lines = text.split('\n').slice(0, 6);
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    if (/^(#{1,3})\s+(.+)/.test(t)) return t.replace(/^#{1,3}\s+/, '').slice(0, 80);
+    if (/^\d+[.)]\s*[A-ZÄÖÜ].{3,60}$/.test(t)) return t.slice(0, 80);
+    if (t === t.toUpperCase() && t.length > 4 && t.length < 70 && /[A-ZÄÖÜ]/.test(t)) return t.slice(0, 80);
+  }
+  return null;
+}
+
+function chunkPages(pages){
+  const chunks = [];
+  let buf = '';
+  let bufStartPage = pages.length ? pages[0].page : 1;
+  let lastTopic = null;
+
+  function flush(endPage){
+    if (!buf.trim()) return;
+    const topic = detectTopic(buf) || lastTopic || ('Seite ' + bufStartPage);
+    lastTopic = topic;
+    chunks.push({ text: buf.trim(), page: bufStartPage, endPage, topic });
+  }
+
+  pages.forEach(p => {
+    const topicHere = detectTopic(p.text);
+    if (topicHere && buf.length > 500) { flush(p.page - 1); buf = buf.slice(-CHUNK_OVERLAP_CHARS); bufStartPage = p.page; }
+    buf += (buf ? '\n' : '') + p.text;
+    while (buf.length > CHUNK_CHARS) {
+      const slice = buf.slice(0, CHUNK_CHARS);
+      const topic = detectTopic(slice) || lastTopic || ('Seite ' + bufStartPage);
+      lastTopic = topic;
+      chunks.push({ text: slice.trim(), page: bufStartPage, endPage: p.page, topic });
+      buf = buf.slice(CHUNK_CHARS - CHUNK_OVERLAP_CHARS);
+      bufStartPage = p.page;
+    }
+  });
+  flush(pages.length ? pages[pages.length - 1].page : bufStartPage);
+  return chunks.filter(c => c.text.length > 40);
+}
+
+/* ============================================================
+   CLAUDE API
+   ============================================================ */
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function callClaudeRaw(userText, apiKey, model, extraInstruction){
+  const messages = [{ role: 'user', content: userText + (extraInstruction ? ('\n\n' + extraInstruction) : '') }];
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({ model, max_tokens: 8000, system: SYSTEM_PROMPT, messages })
+  });
+  if (res.status === 429 || res.status === 529) {
+    const err = new Error('RATE_LIMIT'); err.code = 'RATE_LIMIT'; err.status = res.status; throw err;
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error('API_ERROR ' + res.status + ' ' + body.slice(0,200)); err.code = 'API_ERROR'; err.status = res.status; throw err;
+  }
+  const json = await res.json();
+  const text = (json.content || []).map(c => c.text || '').join('');
+  return text;
+}
+
+async function callClaudeWithBackoff(userText, apiKey, model){
+  let attempt = 0;
+  const maxAttempts = 5;
+  while (true) {
+    try {
+      return await callClaudeRaw(userText, apiKey, model);
+    } catch (e) {
+      if (e.code === 'RATE_LIMIT' && attempt < maxAttempts) {
+        attempt++;
+        const wait = Math.min(30000, 1000 * Math.pow(2, attempt)) + Math.random() * 500;
+        await sleep(wait);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+function stripFences(text){
+  let t = text.trim();
+  t = t.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/,'');
+  const first = t.indexOf('{');
+  const last = t.lastIndexOf('}');
+  if (first >= 0 && last > first) t = t.slice(first, last + 1);
+  return t;
+}
+
+async function generateForChunk(chunk, apiKey, model){
+  let raw = await callClaudeWithBackoff(chunk.text, apiKey, model);
+  let parsed = null;
+  try { parsed = JSON.parse(stripFences(raw)); }
+  catch (e) {
+    // Einmal automatisch mit strikter Anweisung nachfassen
+    raw = await callClaudeRaw(chunk.text, apiKey, model, 'Nur valides JSON, exakt nach dem vorgegebenen Schema, ohne jeden Zusatztext.');
+    parsed = JSON.parse(stripFences(raw));
+  }
+  return parsed;
+}
+
+/* ============================================================
+   DEDUPLIZIERUNG
+   ============================================================ */
+function normalizeFront(s){
+  return String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function jaccard(a, b){
+  const sa = new Set(normalizeFront(a).split(' ').filter(Boolean));
+  const sb = new Set(normalizeFront(b).split(' ').filter(Boolean));
+  if (!sa.size || !sb.size) return 0;
+  let inter = 0;
+  sa.forEach(w => { if (sb.has(w)) inter++; });
+  const union = sa.size + sb.size - inter;
+  return union ? inter / union : 0;
+}
+function dedupeCards(cards){
+  const out = [];
+  cards.forEach(c => {
+    const dup = out.find(o => {
+      const na = normalizeFront(o.front), nb = normalizeFront(c.front);
+      if (na === nb) return true;
+      return jaccard(o.front, c.front) >= 0.8;
+    });
+    if (dup) {
+      dup.tags = Array.from(new Set([...(dup.tags||[]), ...(c.tags||[])]));
+    } else {
+      out.push(c);
+    }
+  });
+  return out;
+}
+
+/* ============================================================
+   SM-2 SCHEDULER
+   ============================================================ */
+// rating: 0=Nochmal 1=Schwer 2=Gut 3=Leicht
+function initSm2(){
+  return { ease: 2.5, interval: 0, reps: 0, lapses: 0, due: todayStr() };
+}
+function jitterDays(days){
+  if (days <= 1) return days;
+  const factor = 1 + (Math.random() * 0.2 - 0.1); // +-10%
+  return Math.max(1, Math.round(days * factor));
+}
+function reviewSm2(sm2, rating){
+  const s = Object.assign({}, sm2);
+  if (rating === 0) {
+    s.lapses = (s.lapses || 0) + 1;
+    s.reps = 0;
+    s.ease = Math.max(1.3, s.ease - 0.2);
+    s.interval = 0; // sofort wieder in dieser Session faellig
+    s.due = todayStr();
+    return s;
+  }
+  if (rating === 1) { // Schwer
+    s.ease = Math.max(1.3, s.ease - 0.15);
+    s.interval = s.reps === 0 ? 1 : Math.max(s.interval + 1, Math.round(s.interval * 1.2));
+  } else if (rating === 2) { // Gut
+    if (s.reps === 0) s.interval = 1;
+    else if (s.reps === 1) s.interval = 6;
+    else s.interval = Math.round(s.interval * s.ease);
+  } else if (rating === 3) { // Leicht
+    s.ease = s.ease + 0.15;
+    if (s.reps === 0) s.interval = 4;
+    else if (s.reps === 1) s.interval = 8;
+    else s.interval = Math.round(s.interval * s.ease * 1.3);
+  }
+  s.interval = jitterDays(Math.max(1, s.interval));
+  s.reps = (s.reps || 0) + 1;
+  const d = new Date();
+  d.setDate(d.getDate() + s.interval);
+  s.due = d.toISOString().slice(0,10);
+  return s;
+}
+
+/* ============================================================
+   IN-MEMORY CACHE
+   ============================================================ */
+let cacheCards = [];
+let cacheExamQs = [];
+let cacheDecks = [];
+let cacheReviews = [];
+
+async function refreshCache(){
+  [cacheCards, cacheExamQs, cacheDecks, cacheReviews] = await Promise.all([
+    idbAll('cards'), idbAll('examQuestions'), idbAll('decks'), idbAll('reviews')
+  ]);
+}
+
+function dueCards(){
+  const t = todayStr();
+  return cacheCards.filter(c => !c.suspended && c.sm2 && c.sm2.due <= t && c.sm2.reps > 0);
+}
+function newCards(){
+  return cacheCards.filter(c => !c.suspended && c.sm2 && c.sm2.reps === 0);
+}
+
+/* ============================================================
+   CRAM-MODUS
+   ============================================================ */
+function evaluateCramMode(){
+  if (!settings.examDate) return { active: false };
+  const days = daysBetween(todayStr(), settings.examDate);
+  if (days <= 0) return { active: false };
+  const openCount = dueCards().length + newCards().length;
+  const secPerCard = SECONDS_PER_CARD_ESTIMATE;
+  const minutesNeededNormally = (openCount * secPerCard) / 60 * 1.6; // Puffer fuer normale SR-Verteilung
+  const minutesAvailable = days * settings.dailyBudgetMin;
+  const active = minutesNeededNormally > minutesAvailable && openCount > 0;
+  return { active, days, openCount, minutesAvailable, minutesNeeded: minutesNeededNormally };
+}
+
+/* ============================================================
+   QUEUE BUILDER
+   ============================================================ */
+let sessionQueue = [];
+let sessionIndex = 0;
+let sessionStats = { correct: 0, total: 0 };
+
+function buildTodayQueue(){
+  const cram = evaluateCramMode();
+  let due = dueCards();
+  let fresh = newCards();
+
+  if (cram.active) {
+    due = due.slice().sort((a,b) => {
+      const errA = (a.sm2.lapses||0) / Math.max(1, a.sm2.reps||1);
+      const errB = (b.sm2.lapses||0) / Math.max(1, b.sm2.reps||1);
+      if (errB !== errA) return errB - errA;
+      return (a.sm2.due||'').localeCompare(b.sm2.due||'');
+    });
+  } else {
+    due = due.slice().sort((a,b) => (a.sm2.due||'').localeCompare(b.sm2.due||''));
+  }
+
+  const limit = settings.newCardLimit;
+  fresh = fresh.slice(0, limit);
+
+  const merged = [];
+  let dueI = 0, freshI = 0, sinceExam = 0;
+  const combinedLen = due.length + fresh.length;
+  const totalSlots = combinedLen;
+  for (let i = 0; i < totalSlots; i++) {
+    if (dueI < due.length) { merged.push({ kind: 'card', item: due[dueI++] }); }
+    else if (freshI < fresh.length) { merged.push({ kind: 'card', item: fresh[freshI++] }); }
+    sinceExam++;
+    if (sinceExam >= 15 && cacheExamQs.length) {
+      const lastTopic = merged.length ? (merged[merged.length-1].item.topic) : null;
+      const pool = lastTopic ? cacheExamQs.filter(q => q.topic === lastTopic) : cacheExamQs;
+      const q = (pool.length ? pool : cacheExamQs)[Math.floor(Math.random() * (pool.length ? pool.length : cacheExamQs.length))];
+      if (q) merged.push({ kind: 'exam', item: q });
+      sinceExam = 0;
+    }
+  }
+  return merged;
+}
+
+/* ============================================================
+   VIEWS: SWITCHING
+   ============================================================ */
+function setView(name){
+  document.querySelectorAll('.ln-view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.ln-nav-btn[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  if (name === 'heute') renderHeute();
+  if (name === 'bibliothek') renderBibliothek();
+  if (name === 'statistik') renderStatistik();
+  if (name === 'lernen') enterSession();
+}
+document.querySelectorAll('.ln-nav-btn[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.addEventListener('click', (e) => {
+  const g = e.target.closest('[data-goto]');
+  if (g) setView(g.dataset.goto);
+});
+
+/* ============================================================
+   RENDER: HEUTE
+   ============================================================ */
+function renderHeute(){
+  const queue = buildTodayQueue();
+  const cardCount = queue.filter(q => q.kind === 'card').length;
+  const minutes = Math.max(1, Math.round(cardCount * SECONDS_PER_CARD_ESTIMATE / 60));
+  const countEl = document.getElementById('lnHeuteCount');
+  const subEl = document.getElementById('lnHeuteSub');
+  const btn = document.getElementById('lnStartBtn');
+
+  if (cardCount === 0) {
+    countEl.textContent = 'Keine Karten fällig';
+    btn.textContent = 'Alles erledigt';
+    btn.disabled = true;
+    subEl.textContent = cacheCards.length === 0
+      ? 'Noch keine Karten vorhanden — importiere Unterlagen in der Bibliothek.'
+      : 'Komm später wieder, oder importiere neue Unterlagen.';
+  } else {
+    countEl.textContent = cardCount + ' Karten, ca. ' + minutes + ' Minuten';
+    btn.textContent = 'Session starten';
+    btn.disabled = false;
+    subEl.textContent = dueCards().length + ' Wiederholungen · ' + Math.min(newCards().length, settings.newCardLimit) + ' neue Karten';
+  }
+
+  const cram = evaluateCramMode();
+  const banner = document.getElementById('lnCramBanner');
+  if (cram.active) {
+    banner.style.display = 'flex';
+    banner.innerHTML = '<span>⚠</span><span>Cram-Modus aktiv: Bei ' + cram.openCount + ' offenen Karten und ' + cram.days + ' Tagen bis zur Prüfung werden Wiederholungsabstände gekürzt und nach Fehlerquote priorisiert.</span>';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  const streak = loadStreak();
+  document.getElementById('lnStreakVal').textContent = streak.count || 0;
+  document.getElementById('lnStatStreak').textContent = streak.count || 0;
+  document.getElementById('lnStatToday').textContent = streak.lastDate === todayStr() ? (streak.todayCount||0) : 0;
+  document.getElementById('lnStatTotal').textContent = cacheCards.length;
+  const lastAcc = streak.lastAccuracy;
+  document.getElementById('lnStatAccuracy').textContent = (lastAcc == null) ? '–' : Math.round(lastAcc*100) + '%';
+}
+document.getElementById('lnStartBtn').addEventListener('click', () => setView('lernen'));
+
+/* ============================================================
+   SESSION RUNTIME
+   ============================================================ */
+let sessionTimerInterval = null;
+let sessionSecondsLeft = SESSION_WORK_MIN * 60;
+let sessionOnBreak = false;
+let currentCardRevealed = false;
+
+function enterSession(){
+  sessionQueue = buildTodayQueue();
+  sessionIndex = 0;
+  sessionStats = { correct: 0, total: 0 };
+  const empty = document.getElementById('lnSessionEmpty');
+  const active = document.getElementById('lnSessionActive');
+  if (!sessionQueue.length) {
+    empty.style.display = 'block';
+    active.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  active.style.display = 'block';
+  startSessionTimer();
+  renderCurrentCard();
+}
+
+function startSessionTimer(){
+  clearInterval(sessionTimerInterval);
+  sessionSecondsLeft = SESSION_WORK_MIN * 60;
+  sessionOnBreak = false;
+  updateTimerUI();
+  sessionTimerInterval = setInterval(() => {
+    sessionSecondsLeft--;
+    if (sessionSecondsLeft <= 0) {
+      sessionOnBreak = !sessionOnBreak;
+      sessionSecondsLeft = (sessionOnBreak ? SESSION_BREAK_MIN : SESSION_WORK_MIN) * 60;
+      toast(sessionOnBreak ? 'Pause — 10 Minuten.' : 'Weiter geht’s — 50 Minuten.');
+    }
+    updateTimerUI();
+  }, 1000);
+}
+function updateTimerUI(){
+  const total = (sessionOnBreak ? SESSION_BREAK_MIN : SESSION_WORK_MIN) * 60;
+  const pct = clamp(sessionSecondsLeft / total, 0, 1);
+  const circumference = 138.2;
+  document.getElementById('lnTimerCircle').style.strokeDashoffset = String(circumference * (1 - pct));
+  const m = Math.floor(sessionSecondsLeft / 60), s = sessionSecondsLeft % 60;
+  document.getElementById('lnTimerLabel').textContent = (m<10?'0':'')+m + ':' + (s<10?'0':'')+s;
+}
+
+function renderCurrentCard(){
+  currentCardRevealed = false;
+  const stage = document.getElementById('lnCardStage');
+  const entry = sessionQueue[sessionIndex];
+  document.getElementById('lnProgressText').textContent = 'Karte ' + (sessionIndex+1) + ' von ' + sessionQueue.length;
+
+  if (!entry) { finishSession(); return; }
+
+  if (entry.kind === 'exam') {
+    renderExamQuestion(stage, entry.item);
+    return;
+  }
+
+  const card = entry.item;
+  let frontHtml = escapeHtml(card.front);
+  if (card.type === 'cloze') {
+    frontHtml = frontHtml.replace(/\{\{c\d+::(.*?)\}\}/g, '<span class="cloze">[ ? ]</span>');
+  }
+  stage.innerHTML =
+    '<div class="ln-card-topic">' + escapeHtml(card.topic || '') + '</div>' +
+    '<div class="ln-card-type">' + (card.type === 'cloze' ? 'Cloze' : card.type === 'list' ? 'Liste' : 'Frage') + '</div>' +
+    '<div class="ln-card-front">' + frontHtml + '</div>' +
+    '<div id="lnCardBackWrap"></div>' +
+    '<div class="ln-flip-hint" id="lnFlipHint">Leertaste zum Aufdecken</div>';
+  stage.focus();
+}
+
+function revealCard(){
+  if (currentCardRevealed) return;
+  currentCardRevealed = true;
+  const entry = sessionQueue[sessionIndex];
+  const card = entry.item;
+  const backWrap = document.getElementById('lnCardBackWrap');
+  const hint = document.getElementById('lnFlipHint');
+  if (hint) hint.remove();
+  let backHtml = escapeHtml(card.back);
+  if (card.type === 'cloze') {
+    const front = escapeHtml(card.front).replace(/\{\{c\d+::(.*?)\}\}/g, '<span class="cloze">$1</span>');
+    backHtml = front;
+  }
+  backWrap.innerHTML =
+    '<div class="ln-card-back">' + backHtml + '</div>' +
+    (card.sourcePage ? '<div class="ln-card-source">Quelle: S. ' + card.sourcePage + '</div>' : '') +
+    '<div class="ln-rate-row">' +
+      '<button class="ln-rate-btn" data-r="0">Nochmal<small>1</small></button>' +
+      '<button class="ln-rate-btn" data-r="1">Schwer<small>2</small></button>' +
+      '<button class="ln-rate-btn" data-r="2">Gut<small>3</small></button>' +
+      '<button class="ln-rate-btn" data-r="3">Leicht<small>4</small></button>' +
+    '</div>' +
+    '<button class="ln-explain-btn" id="lnExplainBtn">Erklär mir das</button>' +
+    '<div id="lnExplainBox"></div>';
+  document.querySelectorAll('.ln-rate-btn').forEach(b => b.addEventListener('click', () => rateCurrentCard(parseInt(b.dataset.r,10))));
+  document.getElementById('lnExplainBtn').addEventListener('click', explainCurrentCard);
+}
+
+async function explainCurrentCard(){
+  const entry = sessionQueue[sessionIndex];
+  const card = entry.item;
+  const box = document.getElementById('lnExplainBox');
+  if (card.explanation) { box.innerHTML = '<div class="ln-explain-box">' + escapeHtml(card.explanation) + '</div>'; return; }
+  if (!settings.apiKey) { errKeyMissing(); return; }
+  box.innerHTML = '<div class="ln-explain-box">Lädt…</div>';
+  try {
+    const text = await callClaudeWithBackoff(
+      'Erkläre den folgenden Lerninhalt in genau drei Sätzen, einfach und konkret, auf Deutsch. Frage: "' + card.front + '" Antwort: "' + card.back + '"',
+      settings.apiKey, settings.model
+    );
+    card.explanation = text.trim();
+    await idbPut('cards', card);
+    box.innerHTML = '<div class="ln-explain-box">' + escapeHtml(card.explanation) + '</div>';
+  } catch (e) {
+    if (e.code === 'RATE_LIMIT') errRateLimit(); else toast('Erklärung fehlgeschlagen: ' + e.message, { error: true });
+    box.innerHTML = '';
+  }
+}
+
+function renderExamQuestion(stage, q){
+  stage.innerHTML =
+    '<div class="ln-card-topic">' + escapeHtml(q.topic || '') + '</div>' +
+    '<div class="ln-card-type">Prüfungsfrage</div>' +
+    '<div class="ln-card-front">' + escapeHtml(q.question) + '</div>' +
+    (q.type === 'mc' ? '<div class="ln-mc-options" id="lnMcOptions"></div>' : '<div class="ln-flip-hint">Leertaste für Musterantwort</div><div id="lnCardBackWrap"></div>');
+  if (q.type === 'mc') {
+    const wrap = document.getElementById('lnMcOptions');
+    (q.options || []).forEach((opt, i) => {
+      const b = document.createElement('button');
+      b.className = 'ln-mc-opt';
+      b.textContent = opt;
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.ln-mc-opt').forEach((o, oi) => {
+          o.classList.toggle('correct', oi === q.correct);
+          if (oi !== q.correct) o.classList.toggle('wrong', o === b);
+        });
+        setTimeout(nextCard, 1400);
+      });
+      wrap.appendChild(b);
+    });
+  }
+}
+function revealExamAnswer(){
+  const entry = sessionQueue[sessionIndex];
+  if (entry.item.type === 'mc') return;
+  const backWrap = document.getElementById('lnCardBackWrap');
+  if (!backWrap || backWrap.innerHTML) return;
+  backWrap.innerHTML = '<div class="ln-card-back">' + escapeHtml(entry.item.model_answer || '') + '</div>';
+  setTimeout(nextCard, 2200);
+}
+
+function rateCurrentCard(rating){
+  const entry = sessionQueue[sessionIndex];
+  const card = entry.item;
+  sessionStats.total++;
+  if (rating >= 2) sessionStats.correct++;
+  card.sm2 = reviewSm2(card.sm2 || initSm2(), rating);
+  if (rating === 0 && card.sm2.lapses >= LEECH_THRESHOLD) card.leech = true;
+  idbPut('cards', card);
+  idbPut('reviews', { id: uid('rev'), cardId: card.id, date: todayStr(), rating, topic: card.topic || '' });
+  cacheReviews.push({ id: 'tmp', cardId: card.id, date: todayStr(), rating, topic: card.topic || '' });
+
+  const streak = loadStreak();
+  if (streak.lastDate !== todayStr()) {
+    const wasYesterday = streak.lastDate === new Date(Date.now()-86400000).toISOString().slice(0,10);
+    streak.count = wasYesterday ? (streak.count||0)+1 : 1;
+    streak.lastDate = todayStr();
+    streak.todayCount = 0;
+  }
+  streak.todayCount = (streak.todayCount||0) + 1;
+  saveStreak(streak);
+
+  if (rating === 0) {
+    sessionQueue.push({ kind: 'card', item: card });
+  }
+  nextCard();
+}
+function nextCard(){
+  sessionIndex++;
+  renderCurrentCard();
+}
+function finishSession(){
+  clearInterval(sessionTimerInterval);
+  const streak = loadStreak();
+  streak.lastAccuracy = sessionStats.total ? sessionStats.correct / sessionStats.total : null;
+  saveStreak(streak);
+  toast('Session beendet: ' + sessionStats.correct + '/' + sessionStats.total + ' richtig.');
+  setView('heute');
+}
+document.getElementById('lnEndSessionBtn').addEventListener('click', finishSession);
+
+document.addEventListener('keydown', (e) => {
+  const view = document.getElementById('view-lernen');
+  if (!view.classList.contains('active')) return;
+  if (document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const entry = sessionQueue[sessionIndex];
+  if (!entry) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (entry.kind === 'exam') revealExamAnswer(); else revealCard();
+  } else if (['Digit1','Digit2','Digit3','Digit4'].includes(e.code) && currentCardRevealed && entry.kind === 'card') {
+    rateCurrentCard(parseInt(e.code.slice(-1),10) - 1);
+  } else if (e.code === 'ArrowRight' && currentCardRevealed) {
+    nextCard();
+  } else if (e.code === 'ArrowLeft' && sessionIndex > 0) {
+    sessionIndex--; renderCurrentCard();
+  }
+});
+
+/* ============================================================
+   IMPORT PIPELINE
+   ============================================================ */
+const importRowEls = new Map();
+function ensureImportRow(fileName){
+  const wrap = document.getElementById('lnImportProgress');
+  const row = document.createElement('div');
+  row.className = 'ln-glass ln-import-row';
+  row.innerHTML = '<div class="fname">' + escapeHtml(fileName) + '</div><div class="pbar"><div style="width:0%"></div></div><div class="status">Wartet…</div>';
+  wrap.appendChild(row);
+  importRowEls.set(fileName, row);
+  return row;
+}
+function updateImportRow(fileName, pct, statusText, cls){
+  const row = importRowEls.get(fileName);
+  if (!row) return;
+  row.querySelector('.pbar>div').style.width = pct + '%';
+  row.querySelector('.status').textContent = statusText;
+  row.className = 'ln-glass ln-import-row' + (cls ? ' ' + cls : '');
+}
+
+let pendingReviewCards = [];
+let pendingReviewExamQs = [];
+let pendingReviewSummaries = [];
+let currentImportDeckId = null;
+
+async function importFiles(fileList){
+  if (!settings.apiKey) { errKeyMissing(); return; }
+  const files = Array.from(fileList);
+  pendingReviewCards = [];
+  pendingReviewExamQs = [];
+  pendingReviewSummaries = [];
+
+  let deck = cacheDecks[0];
+  if (!deck) {
+    deck = { id: uid('deck'), name: settings.subject || 'Allgemein', sourceIds: [], createdAt: Date.now() };
+    await idbPut('decks', deck);
+    cacheDecks.push(deck);
+  }
+  currentImportDeckId = deck.id;
+
+  for (const file of files) {
+    ensureImportRow(file.name);
+    await importSingleFile(file, deck);
+  }
+  await refreshCache();
+  showReviewStep();
+}
+
+async function importSingleFile(file, deck){
+  const sourceId = uid('src');
+  updateImportRow(file.name, 8, 'extrahiert wird…');
+  let extraction;
+  try {
+    extraction = await extractFile(file);
+  } catch (e) {
+    if (e.code === 'NO_TEXT_LAYER') {
+      errNoTextLayer(file.name);
+      const useOcr = confirm('Texterkennung (OCR) für „' + file.name + '" jetzt starten? Das kann mehrere Minuten dauern.');
+      if (useOcr) {
+        try {
+          updateImportRow(file.name, 15, 'OCR läuft (kann dauern)…');
+          extraction = await extractImageOcr(file);
+        } catch (e2) {
+          updateImportRow(file.name, 100, 'OCR fehlgeschlagen: ' + e2.message, 'failed');
+          return;
+        }
+      } else {
+        updateImportRow(file.name, 100, 'Übersprungen — kein Textlayer.', 'failed');
+        return;
+      }
+    } else if (e.code === 'FILE_TOO_BIG') {
+      updateImportRow(file.name, 100, 'Zu groß.', 'failed');
+      return;
+    } else {
+      updateImportRow(file.name, 100, 'Extraktion fehlgeschlagen: ' + e.message, 'failed');
+      return;
+    }
+  }
+
+  await idbPut('sources', { id: sourceId, name: file.name, type: file.type || 'unknown', status: 'extrahiert', pageCount: extraction.pageCount, importedAt: Date.now() });
+  deck.sourceIds.push(sourceId);
+  await idbPut('decks', deck);
+
+  updateImportRow(file.name, 25, 'zerlegt wird…');
+  const chunks = chunkPages(extraction.pages).map(c => ({
+    id: uid('chunk'), sourceId, topic: c.topic, text: c.text, page: c.page, endPage: c.endPage,
+    status: 'pending', retryCount: 0
+  }));
+  await idbPutMany('chunks', chunks);
+
+  if (!chunks.length) {
+    updateImportRow(file.name, 100, 'Kein verwertbarer Text gefunden.', 'failed');
+    return;
+  }
+
+  updateImportRow(file.name, 30, '0 / ' + chunks.length + ' Abschnitte generiert…');
+  let done = 0, failed = 0;
+  const retryList = [];
+
+  async function runOne(chunk){
+    try {
+      const result = await generateForChunk(chunk, settings.apiKey, settings.model);
+      chunk.status = 'done';
+      (result.cards || []).forEach(c => pendingReviewCards.push(Object.assign({
+        id: uid('card'), deckId: deck.id, topic: result.topic || chunk.topic,
+        sourceFile: file.name, sourcePage: c.source_page || chunk.page,
+        difficulty: c.difficulty || 1, tags: c.tags || [], sm2: initSm2(), suspended: false, leech: false
+      }, { type: c.type, front: c.front, back: c.back })));
+      (result.exam_questions || []).forEach(q => pendingReviewExamQs.push(Object.assign({
+        id: uid('exq'), deckId: deck.id, topic: result.topic || chunk.topic, sourcePage: q.source_page || chunk.page
+      }, q)));
+      if (result.summary) pendingReviewSummaries.push({ topic: result.topic || chunk.topic, summary: result.summary, keyTerms: result.key_terms || [] });
+      done++;
+    } catch (e) {
+      chunk.status = 'failed';
+      chunk.retryCount = (chunk.retryCount || 0) + 1;
+      failed++;
+      retryList.push({ chunk, error: e });
+      if (e.code === 'RATE_LIMIT') errRateLimit();
+    } finally {
+      await idbPut('chunks', chunk);
+      updateImportRow(file.name, 30 + Math.round(((done+failed) / chunks.length) * 65), (done+failed) + ' / ' + chunks.length + ' Abschnitte (' + failed + ' fehlgeschlagen)…');
+    }
+  }
+
+  let idx = 0;
+  async function worker(){
+    while (idx < chunks.length) {
+      const c = chunks[idx++];
+      await runOne(c);
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(MAX_CONCURRENT, chunks.length)}, worker));
+
+  pendingReviewCards = dedupeCards(pendingReviewCards);
+
+  const src = await idbGet('sources', sourceId);
+  src.status = failed === chunks.length ? 'fehlgeschlagen' : 'fertig';
+  await idbPut('sources', src);
+
+  if (failed > 0) {
+    updateImportRow(file.name, 100, done + '/' + chunks.length + ' fertig, ' + failed + ' fehlgeschlagen (Rest lief weiter).', done > 0 ? 'done' : 'failed');
+  } else {
+    updateImportRow(file.name, 100, 'Fertig — ' + done + ' Abschnitte verarbeitet.', 'done');
+  }
+}
+
+function showReviewStep(){
+  const step = document.getElementById('lnReviewStep');
+  const list = document.getElementById('lnReviewList');
+  if (!pendingReviewCards.length && !pendingReviewExamQs.length) {
+    step.style.display = 'none';
+    toast('Keine neuen Karten generiert.', { error: true, next: 'Prüfe, ob die Datei verwertbaren Text enthielt.' });
+    return;
+  }
+  step.style.display = 'block';
+  document.getElementById('lnReviewCount').textContent = pendingReviewCards.length + ' Karten, ' + pendingReviewExamQs.length + ' Prüfungsfragen';
+  list.innerHTML = '';
+  pendingReviewCards.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'ln-glass ln-review-card';
+    row.innerHTML =
+      '<div class="top"><span class="ln-topic-chip">' + escapeHtml(c.topic||'') + '</span><span class="ln-topic-chip">' + c.type + '</span></div>' +
+      '<div class="front">' + escapeHtml(c.front) + '</div>' +
+      '<div class="back">' + escapeHtml(c.back) + '</div>' +
+      '<div class="ln-review-actions">' +
+        '<button class="ln-btn" data-act="known">Schon gekonnt</button>' +
+        '<button class="ln-btn" data-act="del">Löschen</button>' +
+      '</div>';
+    row.querySelector('[data-act="del"]').addEventListener('click', () => { pendingReviewCards[i] = null; row.remove(); });
+    row.querySelector('[data-act="known"]').addEventListener('click', () => {
+      pendingReviewCards[i].sm2 = Object.assign(initSm2(), { reps: 2, interval: 30, due: new Date(Date.now()+30*86400000).toISOString().slice(0,10) });
+      row.style.opacity = '.5';
+    });
+    list.appendChild(row);
+  });
+}
+document.getElementById('lnReviewFinishBtn').addEventListener('click', async () => {
+  const finalCards = pendingReviewCards.filter(Boolean);
+  await idbPutMany('cards', finalCards);
+  await idbPutMany('examQuestions', pendingReviewExamQs);
+  document.getElementById('lnReviewStep').style.display = 'none';
+  document.getElementById('lnImportProgress').innerHTML = '';
+  importRowEls.clear();
+  pendingReviewCards = []; pendingReviewExamQs = [];
+  await refreshCache();
+  toast('Karten übernommen — bereit zum Lernen.');
+  setView('heute');
+});
+
+const dropzone = document.getElementById('lnDropzone');
+const fileInput = document.getElementById('lnFileInput');
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) importFiles(fileInput.files); fileInput.value = ''; });
+
+/* ============================================================
+   RENDER: BIBLIOTHEK
+   ============================================================ */
+function renderBibliothek(){
+  const wrap = document.getElementById('lnDeckList');
+  if (!cacheDecks.length) {
+    wrap.innerHTML = '<div class="ln-glass ln-empty"><strong>Noch keine Decks</strong>Zieh oben eine Datei rein, um dein erstes Deck zu erzeugen.</div>';
+    document.getElementById('lnCardSearchResults').innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = cacheDecks.map(d => {
+    const deckCards = cacheCards.filter(c => c.deckId === d.id);
+    const learned = deckCards.filter(c => c.sm2 && c.sm2.reps > 0).length;
+    const pct = deckCards.length ? Math.round(learned / deckCards.length * 100) : 0;
+    const topics = Array.from(new Set(deckCards.map(c => c.topic).filter(Boolean))).slice(0, 8);
+    return '<div class="ln-glass" style="padding:16px;margin-bottom:14px;">' +
+      '<div class="ln-deck-row" style="padding:0;margin-bottom:8px;">' +
+        '<div class="name">' + escapeHtml(d.name) + '</div>' +
+        '<div class="ln-bar"><div style="width:' + pct + '%"></div></div>' +
+        '<div class="pct">' + learned + '/' + deckCards.length + '</div>' +
+      '</div>' +
+      '<div>' + topics.map(t => '<span class="ln-topic-chip">' + escapeHtml(t) + '</span>').join('') + '</div>' +
+    '</div>';
+  }).join('');
+  renderCardSearch();
+}
+function renderCardSearch(){
+  const q = (document.getElementById('lnSearch').value || '').toLowerCase().trim();
+  const wrap = document.getElementById('lnCardSearchResults');
+  let cards = cacheCards;
+  if (q) cards = cards.filter(c => (c.front+' '+c.back+' '+(c.topic||'')).toLowerCase().includes(q));
+  const leeches = cards.filter(c => c.leech);
+  const rest = cards.filter(c => !c.leech).slice(0, 60);
+  const rows = [];
+  leeches.forEach(c => rows.push(cardRowHtml(c, true)));
+  rest.forEach(c => rows.push(cardRowHtml(c, false)));
+  wrap.innerHTML = rows.length ? ('<div class="ln-glass" style="margin-top:16px;">' + rows.join('') + '</div>') : '';
+  wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openCardEdit(b.dataset.edit)));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => { await idbDelete('cards', b.dataset.del); await refreshCache(); renderBibliothek(); }));
+  wrap.querySelectorAll('[data-reformulate]').forEach(b => b.addEventListener('click', () => reformulateLeech(b.dataset.reformulate)));
+}
+function cardRowHtml(c, isLeech){
+  return '<div class="ln-card-list-row' + (isLeech ? ' ln-leech-row' : '') + '">' +
+    '<div class="front">' + escapeHtml(c.front) + '</div>' +
+    '<span class="tag">' + escapeHtml(c.topic||'') + '</span>' +
+    (isLeech ? '<button class="ln-mini-icon-btn" data-reformulate="'+c.id+'" title="Umformulieren">↻</button>' : '') +
+    '<button class="ln-mini-icon-btn" data-edit="'+c.id+'" title="Bearbeiten">✎</button>' +
+    '<button class="ln-mini-icon-btn" data-del="'+c.id+'" title="Löschen">×</button>' +
+  '</div>';
+}
+document.getElementById('lnSearch').addEventListener('input', renderCardSearch);
+
+let editingCardId = null;
+function openCardEdit(id){
+  const card = cacheCards.find(c => c.id === id);
+  if (!card) return;
+  editingCardId = id;
+  document.getElementById('lnEditFront').value = card.front;
+  document.getElementById('lnEditBack').value = card.back;
+  document.getElementById('lnEditTags').value = (card.tags||[]).join(', ');
+  document.getElementById('lnCardEditModalBg').classList.add('show');
+}
+document.getElementById('lnEditCancelBtn').addEventListener('click', () => document.getElementById('lnCardEditModalBg').classList.remove('show'));
+document.getElementById('lnEditSaveBtn').addEventListener('click', async () => {
+  const card = cacheCards.find(c => c.id === editingCardId);
+  if (!card) return;
+  card.front = document.getElementById('lnEditFront').value;
+  card.back = document.getElementById('lnEditBack').value;
+  card.tags = document.getElementById('lnEditTags').value.split(',').map(s => s.trim()).filter(Boolean);
+  await idbPut('cards', card);
+  document.getElementById('lnCardEditModalBg').classList.remove('show');
+  await refreshCache();
+  renderBibliothek();
+});
+
+async function reformulateLeech(id){
+  if (!settings.apiKey) { errKeyMissing(); return; }
+  const card = cacheCards.find(c => c.id === id);
+  if (!card) return;
+  toast('Karte wird umformuliert…');
+  try {
+    const text = await callClaudeWithBackoff(
+      'Diese Karteikarte wurde 6-mal falsch beantwortet und ist vermutlich zu unklar oder zu komplex formuliert. ' +
+      'Ursprüngliche Karte — Vorderseite: "' + card.front + '" Rückseite: "' + card.back + '". ' +
+      'Gib ausschließlich ein JSON-Array mit ein oder zwei neuen, klareren, einfacheren Karten im Format ' +
+      '[{"front":"...","back":"..."}] zurück, ohne Fließtext.',
+      settings.apiKey, settings.model
+    );
+    const arr = JSON.parse(stripFences(text).replace(/^[^\[]*/, '').replace(/[^\]]*$/, ''));
+    if (Array.isArray(arr) && arr.length) {
+      await idbDelete('cards', card.id);
+      const newCardsArr = arr.map(x => Object.assign({
+        id: uid('card'), deckId: card.deckId, topic: card.topic, sourceFile: card.sourceFile, sourcePage: card.sourcePage,
+        type: 'qa', difficulty: card.difficulty, tags: card.tags, sm2: initSm2(), suspended: false, leech: false
+      }, { front: x.front, back: x.back }));
+      await idbPutMany('cards', newCardsArr);
+      await refreshCache();
+      renderBibliothek();
+      toast('In ' + newCardsArr.length + ' neue Karte(n) aufgeteilt.');
+    }
+  } catch (e) {
+    toast('Umformulieren fehlgeschlagen: ' + e.message, { error: true });
+  }
+}
+
+/* ============================================================
+   EXPORT / IMPORT
+   ============================================================ */
+function downloadBlob(content, filename, type){
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+document.getElementById('lnExportJsonBtn').addEventListener('click', async () => {
+  const [sources, chunks, decks, cards, examQuestions, reviews] = await Promise.all(STORES.map(idbAll));
+  downloadBlob(JSON.stringify({ sources, chunks, decks, cards, examQuestions, reviews, exportedAt: Date.now() }, null, 2),
+    'skyos-lernen-backup-' + todayStr() + '.json', 'application/json');
+});
+function csvEscape(s){
+  s = String(s == null ? '' : s).replace(/\n/g, ' ');
+  if (/[;"]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+document.getElementById('lnExportCsvBtn').addEventListener('click', () => {
+  const lines = cacheCards.map(c => [csvEscape(c.front), csvEscape(c.back), csvEscape((c.tags||[]).join(' '))].join(';'));
+  downloadBlob(lines.join('\n'), 'skyos-lernen-anki-' + todayStr() + '.csv', 'text/csv');
+});
+document.getElementById('lnImportJsonBtn').addEventListener('click', () => document.getElementById('lnImportJsonFile').click());
+document.getElementById('lnImportJsonFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const backup = {};
+    for (const s of STORES) backup[s] = await idbAll(s);
+    downloadBlob(JSON.stringify(backup), 'skyos-lernen-autobackup-' + Date.now() + '.json', 'application/json');
+    for (const s of STORES) if (Array.isArray(data[s])) await idbPutMany(s, data[s]);
+    await refreshCache();
+    renderBibliothek();
+    toast('Import zusammengeführt (' + (data.cards||[]).length + ' Karten).');
+  } catch (err) {
+    toast('Import fehlgeschlagen: Datei ist kein gültiges Backup.', { error: true });
+  }
+  e.target.value = '';
+});
+
+/* ============================================================
+   RENDER: STATISTIK
+   ============================================================ */
+function simulateInflow(days){
+  const perDay = new Array(days).fill(0);
+  const virtualDue = cacheCards.filter(c => !c.suspended && c.sm2 && c.sm2.reps > 0).map(c => ({
+    dueOffset: Math.max(0, daysBetween(todayStr(), c.sm2.due)),
+    interval: Math.max(1, c.sm2.interval || 1), ease: c.sm2.ease || 2.5
+  }));
+  const freshCount = newCards().length;
+  let freshIntroduced = 0;
+  const limitPerDay = settings.newCardLimit;
+
+  for (let d = 0; d < days; d++) {
+    virtualDue.forEach(v => { if (v.dueOffset === d) perDay[d]++; });
+    const todaysNew = Math.min(limitPerDay, freshCount - freshIntroduced);
+    if (todaysNew > 0) {
+      perDay[d] += todaysNew;
+      freshIntroduced += todaysNew;
+      for (let n = 0; n < todaysNew; n++) {
+        const nextInterval = Math.round(1 * 2.5);
+        virtualDue.push({ dueOffset: d + nextInterval, interval: nextInterval, ease: 2.5 });
+      }
+    }
+    virtualDue.forEach(v => {
+      if (v.dueOffset === d) {
+        const nextInterval = Math.max(1, Math.round(v.interval * v.ease));
+        v.dueOffset = d + nextInterval;
+        v.interval = nextInterval;
+      }
+    });
+  }
+  return perDay;
+}
+function drawInflowChart(perDay){
+  const canvas = document.getElementById('lnInflowChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const max = Math.max(1, ...perDay, Math.ceil(settings.dailyBudgetMin*60/SECONDS_PER_CARD_ESTIMATE));
+  const barW = W / perDay.length;
+  const budgetCards = settings.dailyBudgetMin * 60 / SECONDS_PER_CARD_ESTIMATE;
+
+  perDay.forEach((v, i) => {
+    const h = (v / max) * (H - 30);
+    const over = v > budgetCards;
+    ctx.fillStyle = over ? 'rgba(242,109,109,.75)' : 'rgba(124,156,255,.75)';
+    ctx.fillRect(i*barW + 1, H - h - 20, Math.max(1,barW-2), h);
+  });
+  const budgetY = H - 20 - (budgetCards / max) * (H - 30);
+  ctx.strokeStyle = '#f0b95c'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0, budgetY); ctx.lineTo(W, budgetY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '11px sans-serif';
+  ctx.fillText('Tag 1', 2, H-4); ctx.fillText('Tag ' + perDay.length, W-46, H-4);
+}
+function renderStatistik(){
+  document.getElementById('lnNewLimitInput').value = settings.newCardLimit;
+  const perDay = simulateInflow(30);
+  drawInflowChart(perDay);
+  const avg7 = perDay.slice(0,7).reduce((a,b)=>a+b,0) / 7;
+  const budgetCards = settings.dailyBudgetMin * 60 / SECONDS_PER_CARD_ESTIMATE;
+  document.getElementById('lnImpactText').textContent = 'Ø nächste 7 Tage: ' + Math.round(avg7) + ' Karten/Tag (Budget ≈ ' + Math.round(budgetCards) + ')';
+
+  const heatmap = document.getElementById('lnHeatmap');
+  const counts = {};
+  cacheReviews.forEach(r => { counts[r.date] = (counts[r.date]||0)+1; });
+  let html = '';
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
+    const c = counts[d] || 0;
+    const alpha = c === 0 ? 0.06 : Math.min(1, 0.2 + c*0.08);
+    html += '<div title="' + d + ': ' + c + '" style="background:rgba(124,156,255,' + alpha + ')"></div>';
+  }
+  heatmap.innerHTML = html;
+
+  const topicStats = {};
+  cacheReviews.forEach(r => {
+    if (!r.topic) return;
+    topicStats[r.topic] = topicStats[r.topic] || { total: 0, wrong: 0 };
+    topicStats[r.topic].total++;
+    if (r.rating === 0) topicStats[r.topic].wrong++;
+  });
+  const weak = Object.entries(topicStats)
+    .map(([topic, s]) => ({ topic, rate: s.wrong / s.total, total: s.total }))
+    .filter(t => t.total >= 3)
+    .sort((a,b) => b.rate - a.rate).slice(0,5);
+  const weakWrap = document.getElementById('lnWeakTopics');
+  weakWrap.innerHTML = weak.length ? weak.map(w =>
+    '<div class="ln-weak-topic-row"><div class="t">' + escapeHtml(w.topic) + '</div><div class="r">' + Math.round(w.rate*100) + '% Fehler</div>' +
+    '<button class="ln-btn" data-focus="' + escapeHtml(w.topic) + '">Fokus-Session</button></div>'
+  ).join('') : '<div style="color:var(--ln-text-3);font-size:13px;padding:10px 0;">Noch nicht genug Daten.</div>';
+  weakWrap.querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
+    const topic = b.dataset.focus;
+    sessionQueue = cacheCards.filter(c => c.topic === topic && !c.suspended).map(item => ({ kind: 'card', item }));
+    sessionIndex = 0; sessionStats = { correct: 0, total: 0 };
+    setView('lernen');
+    document.getElementById('lnSessionEmpty').style.display = sessionQueue.length ? 'none' : 'block';
+    document.getElementById('lnSessionActive').style.display = sessionQueue.length ? 'block' : 'none';
+    if (sessionQueue.length) { startSessionTimer(); renderCurrentCard(); }
+  }));
+}
+document.getElementById('lnNewLimitInput').addEventListener('input', (e) => {
+  settings.newCardLimit = clamp(parseInt(e.target.value,10) || 0, 0, 200);
+  saveSettings(settings);
+  const perDay = simulateInflow(30);
+  drawInflowChart(perDay);
+  const d7 = perDay.slice(0,7).reduce((a,b)=>a+b,0), d14 = perDay.slice(0,14).reduce((a,b)=>a+b,0), d30 = perDay.reduce((a,b)=>a+b,0);
+  document.getElementById('lnImpactText').textContent = '7 Tage: ' + d7 + ' · 14 Tage: ' + d14 + ' · 30 Tage: ' + d30 + ' Karten gesamt';
+});
+
+/* ============================================================
+   SETTINGS MODAL
+   ============================================================ */
+function openSettings(){
+  document.getElementById('lnApiKey').value = settings.apiKey;
+  document.getElementById('lnModelInput').value = settings.model;
+  document.getElementById('lnSubjectInput').value = settings.subject;
+  document.getElementById('lnExamDateInput').value = settings.examDate;
+  document.getElementById('lnBudgetInput').value = settings.dailyBudgetMin;
+  document.getElementById('lnNewLimitSettingsInput').value = settings.newCardLimit;
+  document.getElementById('lnSettingsModalBg').classList.add('show');
+}
+document.getElementById('lnSettingsBtn').addEventListener('click', openSettings);
+document.getElementById('lnSettingsCancelBtn').addEventListener('click', () => document.getElementById('lnSettingsModalBg').classList.remove('show'));
+document.getElementById('lnSettingsSaveBtn').addEventListener('click', () => {
+  settings.apiKey = document.getElementById('lnApiKey').value.trim();
+  settings.model = document.getElementById('lnModelInput').value.trim() || 'claude-sonnet-4-6';
+  settings.subject = document.getElementById('lnSubjectInput').value.trim() || 'Allgemein';
+  settings.examDate = document.getElementById('lnExamDateInput').value;
+  settings.dailyBudgetMin = clamp(parseInt(document.getElementById('lnBudgetInput').value,10) || 60, 5, 600);
+  settings.newCardLimit = clamp(parseInt(document.getElementById('lnNewLimitSettingsInput').value,10) || 20, 0, 200);
+  saveSettings(settings);
+  document.getElementById('lnSettingsModalBg').classList.remove('show');
+  toast('Einstellungen gespeichert.');
+  renderHeute();
+});
+
+/* ============================================================
+   SITE-WIDE NAV (Lernen als Leiste in der ganzen SkyOS-Seite)
+   ============================================================ */
+const SITE_PAGES = [
+  { href: 'index.html', label: 'Dashboard' },
+  { href: 'health.html', label: 'Health' },
+  { href: 'po-water.html', label: 'Water' },
+  { href: 'po-coach.html', label: 'Coach' },
+  { href: 'finance.html', label: 'Finance' },
+  { href: 'skyos_lernen.html', label: 'Lernen' }
+];
+function renderSiteNav(){
+  const nav = document.getElementById('lnSiteNav');
+  nav.style.display = 'flex';
+  nav.innerHTML = SITE_PAGES.map(p =>
+    '<a href="' + p.href + '" class="' + (p.href === 'skyos_lernen.html' ? 'current' : '') + '">' + p.label + '</a>'
+  ).join('');
+  document.getElementById('lnMobileTop').insertAdjacentHTML('beforeend',
+    '<div style="display:flex;gap:6px;overflow-x:auto;">' + SITE_PAGES.map(p =>
+      '<a href="' + p.href + '" style="font-size:11px;color:var(--ln-text-3);padding:4px 8px;border-radius:999px;text-decoration:none;' +
+      (p.href === 'skyos_lernen.html' ? 'color:var(--ln-accent);background:var(--ln-accent-dim);' : '') + '">' + p.label + '</a>'
+    ).join('') + '</div>'
+  );
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+async function init(){
+  renderSiteNav();
+  await refreshCache();
+  renderHeute();
+  if (!settings.apiKey) {
+    setTimeout(() => toast('Willkommen bei SkyOS Lernen.', { next: 'Trag in den Einstellungen deinen Anthropic API-Key ein, um Unterlagen zu importieren.' }), 500);
+  }
+}
+init();
+
+})();
+</script>
+</body>
+</html>
